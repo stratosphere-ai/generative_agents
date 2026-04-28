@@ -34,6 +34,12 @@ from global_methods import *
 from utils import *
 from maze import *
 from persona.persona import *
+from vending.events import bus as _vending_bus
+from vending.registry_adapter import TaskRegistryAdapter
+from vending.state import VendingState
+from blockchain.config import load_config as _load_blockchain_config
+from blockchain.client import TaskRegistryClient
+from blockchain.mock import MockTaskRegistryClient
 
 ##############################################################################
 #                                  REVERIE                                   #
@@ -150,11 +156,37 @@ class ReverieServer:
     
     curr_step = dict()
     curr_step["step"] = self.step
-    with open(f"{fs_temp_storage}/curr_step.json", "w") as outfile: 
+    with open(f"{fs_temp_storage}/curr_step.json", "w") as outfile:
       outfile.write(json.dumps(curr_step, indent=2))
 
+    # ------------------------------------------------------------------
+    # Vending-machine extension: mount VendingState and wire TaskRegistry.
+    # No-op unless this sim's personas/<name>/bootstrap_memory/vending_state.json
+    # exists (i.e. the persona is the vending-machine agent).
+    # ------------------------------------------------------------------
+    self._task_registry_client = None
+    self._task_registry_adapter = None
+    for persona_name, persona in self.personas.items():
+      from pathlib import Path as _Path
+      vs_path = _Path(f"{fs_storage}/{self.sim_code}/personas/{persona_name}"
+                      "/bootstrap_memory/vending_state.json")
+      if vs_path.exists():
+        persona.vending_state = VendingState.load(vs_path)
+        persona._vending_state_path = vs_path
 
-  def save(self): 
+    if any(getattr(p, "vending_state", None) for p in self.personas.values()):
+      cfg = _load_blockchain_config(
+        sim_storage_dir=__import__("pathlib").Path(f"{fs_storage}/{self.sim_code}"),
+      )
+      if cfg.mode == "mock":
+        self._task_registry_client = MockTaskRegistryClient(payload_dir=cfg.payload_dir)
+      else:
+        self._task_registry_client = TaskRegistryClient(cfg)
+      self._task_registry_adapter = TaskRegistryAdapter(self._task_registry_client)
+      self._task_registry_adapter.attach()
+
+
+  def save(self):
     """
     Save all Reverie progress -- this includes Reverie's global state as well
     as all the personas.  

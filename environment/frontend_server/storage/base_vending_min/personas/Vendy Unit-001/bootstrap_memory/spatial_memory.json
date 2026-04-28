@@ -1,0 +1,19 @@
+{
+  "plaza_world": {
+    "Central Plaza": {
+      "Vending Corner": [
+        "VendingMachine",
+        "RestockBin",
+        "PowerOutlet"
+      ],
+      "Plaza Square": [
+        "Bench",
+        "Fountain",
+        "StreetLamp"
+      ],
+      "Cafe Sidewalk": [],
+      "North Walkway": [],
+      "South Walkway": []
+    }
+  }
+}

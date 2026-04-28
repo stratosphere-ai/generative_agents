@@ -16,6 +16,11 @@ from persona.prompt_template.run_gpt_prompt import *
 from persona.cognitive_modules.retrieve import *
 from persona.cognitive_modules.converse import *
 
+try:
+  from vending.events import bus as _vending_bus
+except Exception:                                                # pragma: no cover
+  _vending_bus = None
+
 ##############################################################################
 # CHAPTER 2: Generate
 ##############################################################################
@@ -637,19 +642,30 @@ def _determine_action(persona, maze):
   act_obj_event = generate_act_obj_event_triple(act_game_object, 
                                                 act_obj_desp, persona)
 
-  # Adding the action to persona's queue. 
-  persona.scratch.add_new_action(new_address, 
-                                 int(act_dura), 
-                                 act_desp, 
-                                 act_pron, 
+  # Adding the action to persona's queue.
+  persona.scratch.add_new_action(new_address,
+                                 int(act_dura),
+                                 act_desp,
+                                 act_pron,
                                  act_event,
                                  None,
                                  None,
                                  None,
                                  None,
-                                 act_obj_desp, 
-                                 act_obj_pron, 
+                                 act_obj_desp,
+                                 act_obj_pron,
                                  act_obj_event)
+
+  if _vending_bus is not None:
+    _vending_bus.publish({
+      "kind":        "action_start",
+      "persona":     persona.name,
+      "address":     new_address,
+      "duration":    int(act_dura),
+      "description": act_desp,
+      "event":       act_event,
+      "action_key":  f"{persona.name}|{new_address}|{act_desp}",
+    })
 
 
 def _choose_retrieved(persona, retrieved): 
@@ -950,12 +966,50 @@ def plan(persona, maze, personas, new_day, retrieved):
   OUTPUT 
     The target action address of the persona (persona.scratch.act_address).
   """ 
-  # PART 1: Generate the hourly schedule. 
-  if new_day: 
+  # PART 0: Emit hourly_start / hourly_end on cross-hour boundaries so the
+  # vending TaskRegistry adapter can record HOURLY parent tasks.
+  if _vending_bus is not None:
+    last_hour = getattr(persona, "_vending_last_hour", None)
+    cur_hour  = persona.scratch.curr_time.hour
+    cur_date  = persona.scratch.curr_time.date().isoformat()
+    if last_hour != cur_hour:
+      if last_hour is not None:
+        _vending_bus.publish({
+          "kind":         "hourly_end",
+          "persona":      persona.name,
+          "completed_at": persona.scratch.curr_time.isoformat(),
+        })
+      hourly_desc = "operate"
+      try:
+        hourly_org = persona.scratch.f_daily_schedule_hourly_org
+        if hourly_org and 0 <= cur_hour < len(hourly_org):
+          hourly_desc = hourly_org[cur_hour][0]
+      except Exception:                                          # noqa: BLE001
+        pass
+      _vending_bus.publish({
+        "kind":        "hourly_start",
+        "persona":     persona.name,
+        "hour":        cur_hour,
+        "date":        cur_date,
+        "description": hourly_desc,
+      })
+      persona._vending_last_hour = cur_hour
+
+  # PART 1: Generate the hourly schedule.
+  if new_day:
     _long_term_planning(persona, new_day)
 
   # PART 2: If the current action has expired, we want to create a new plan.
-  if persona.scratch.act_check_finished(): 
+  if persona.scratch.act_check_finished():
+    if _vending_bus is not None and persona.scratch.act_address:
+      _vending_bus.publish({
+        "kind":         "action_end",
+        "persona":      persona.name,
+        "address":      persona.scratch.act_address,
+        "description":  persona.scratch.act_description,
+        "completed_at": persona.scratch.curr_time.isoformat(),
+        "action_key":   f"{persona.name}|{persona.scratch.act_address}|{persona.scratch.act_description}",
+      })
     _determine_action(persona, maze)
 
   # PART 3: If you perceived an event that needs to be responded to (saw 

@@ -1,0 +1,11 @@
+{
+  "plaza_world": {
+    "Central Plaza": {
+      "South Walkway": [],
+      "Plaza Square": ["Bench", "Fountain"],
+      "Vending Corner": ["VendingMachine"],
+      "Cafe Sidewalk": [],
+      "North Walkway": []
+    }
+  }
+}

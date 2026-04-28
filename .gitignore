@@ -90,6 +90,11 @@ celerybeat-schedule
 
 # dotenv
 .env
+.env.local
+
+# vending sandbox runtime artifacts
+**/blockchain_journal.jsonl
+**/task_payloads/
 
 # virtualenv
 venv/
