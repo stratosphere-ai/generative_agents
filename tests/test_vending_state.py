@@ -49,6 +49,36 @@ def test_state_preamble_empty_when_no_state():
     assert state_preamble(_P()) == ""
 
 
+def test_attach_to_persona_appends_preamble_to_daily_plan_req():
+    from vending.prompt_inject import attach_to_persona
+    from vending.state import VendingState
+
+    class _Scratch:
+        def __init__(self, body):
+            self._body = body
+        def get_str_daily_plan_req(self):
+            return self._body
+
+    class _P: pass
+    p = _P()
+    p.scratch = _Scratch("Restock before each peak.")
+    p.vending_state = VendingState(
+        inventory    = {"Coke": 5},
+        prices_cents = {"Coke": 150},
+    )
+
+    attach_to_persona(p)
+    out = p.scratch.get_str_daily_plan_req()
+    assert "Restock before each peak." in out
+    assert "Business state" in out
+    assert "Coke=5" in out
+
+    # Idempotent: a second attach must not double-wrap.
+    attach_to_persona(p)
+    out2 = p.scratch.get_str_daily_plan_req()
+    assert out == out2
+
+
 def test_transaction_decrements_inventory_and_credits_cash(tmp_path):
     from vending.state import VendingState
     from vending.transaction import sell, OutOfStock, UnknownSku

@@ -1,10 +1,10 @@
 """Prefix VendingState facts onto Vendy's plan/reflect prompts.
 
-We do NOT touch any prompt template. Instead, the persona module that owns
-the prompt call (e.g. `cognitive_modules/plan.py`'s `_long_term_planning`,
-`reflect.py`) calls `state_preamble(persona)` and prepends the returned text
-to the prompt body. If the persona has no `vending_state` attached the
-preamble is empty and the call is a no-op.
+We do NOT touch any prompt template. Instead, the prompt code reads the
+persona's daily-plan requirement via `persona.scratch.get_str_daily_plan_req()`;
+we wrap that getter on the vending persona so it returns the stored
+daily_plan_req plus a freshly-rendered state preamble. The wrapper lives
+entirely on the bound method and does not modify on-disk scratch.json.
 """
 
 from __future__ import annotations
@@ -25,4 +25,29 @@ def state_preamble(persona: Any) -> str:
     ]
     if state.last_restock_iso:
         lines.append(f"- last restock: {state.last_restock_iso}")
-    return "\n".join(lines) + "\n\n"
+    return "\n".join(lines)
+
+
+def attach_to_persona(persona: Any) -> None:
+    """Wrap `persona.scratch.get_str_daily_plan_req` to append the live state preamble."""
+    state = getattr(persona, "vending_state", None)
+    if state is None:
+        return
+
+    scratch = persona.scratch
+    if getattr(scratch, "_vending_inject_attached", False):
+        return
+
+    original = scratch.get_str_daily_plan_req
+
+    def patched() -> str:
+        body = original()
+        preamble = state_preamble(persona)
+        if not preamble:
+            return body
+        if not body:
+            return preamble
+        return f"{body}\n\n{preamble}"
+
+    scratch.get_str_daily_plan_req = patched
+    scratch._vending_inject_attached = True

@@ -1,0 +1,7 @@
+{
+  "world_name": "plaza_world",
+  "maze_width": 50,
+  "maze_height": 35,
+  "sq_tile_size": 32,
+  "special_constraint": ""
+}

@@ -48,6 +48,24 @@ python scripts/build_maze.py
 bash scripts/e2e.sh                    # interactive: enter base_vending_min
 ```
 
+## Known gaps
+
+- **Phaser frontend visualization** — the upstream Django frontend renders
+  the world from a Tiled `.tmx`/`.json` export. The plaza maze is currently
+  CSV-only (sufficient for backend pathfinding, perception, and chain writes).
+  Hand-authoring a `.tmx` for the plaza is a follow-up; the sim runs
+  end-to-end without the frontend. To peek at state during a run, point a
+  client at the JSONL journal in `storage/<sim>/blockchain_journal.jsonl`
+  or read `cast logs` against the deployed `TaskRegistry`.
+- **Embedding seeds for personas** — `bootstrap_memory/associative_memory/`
+  starts empty; memories accrue during the run. If you want seeded thoughts
+  (e.g. "lunch peak is 12-1pm"), add them to `nodes.json` plus a matching
+  vector in `embeddings.json`.
+- **Cheap-model routing for customers** — the design splits Vendy onto the
+  main model and customer personas onto a cheaper one. The router is not
+  yet implemented in `utils.py`; until then all four personas hit the same
+  model, so 1 sim-day costs ~4× a single-persona run.
+
 ## Modes
 
 `BLOCKCHAIN_MODE` controls the client wiring (default `mock`):

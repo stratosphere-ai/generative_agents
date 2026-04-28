@@ -22,6 +22,15 @@ SECTOR     = "Central Plaza"
 WIDTH  = 50
 HEIGHT = 35
 
+# Marker numbers: cell values in maze CSVs are looked up in special_blocks
+# dicts. "0" means blank. We pick non-overlapping integer ranges per layer.
+WORLD_MARKER     = 25280
+SECTOR_MARKER    = 25281
+ARENA_MARKER_BASE = 25282        # first arena, +1 per arena
+COLLISION_MARKER = 25287
+OBJECT_MARKER_BASE = 32000
+SPAWN_MARKER_BASE  = 33000
+
 # arena rectangles: (top, left, bottom_excl, right_excl, name)
 ARENAS = [
     (5,  3,  15, 13, "Vending Corner"),
@@ -52,15 +61,18 @@ SPAWNS = [
 
 
 def _blank() -> list[list[str]]:
-    return [["" for _ in range(WIDTH)] for _ in range(HEIGHT)]
+    return [["0" for _ in range(WIDTH)] for _ in range(HEIGHT)]
 
 
 def _write_csv(path: Path, grid: list[list[str]]) -> None:
+    """Upstream maze.py reads cell data as a SINGLE row of width*height cells.
+
+    We flatten row-major (matches the Tiled export the upstream uses) and
+    join with ', ' so the existing csv reader splits cleanly.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", newline="") as f:
-        writer = csv.writer(f)
-        for row in grid:
-            writer.writerow(row)
+    flat = [cell for row in grid for cell in row]
+    path.write_text(", ".join(flat))
 
 
 def build() -> None:
@@ -72,27 +84,28 @@ def build() -> None:
     spawn  = _blank()
     coll   = _blank()
 
-    # sector: every walkable tile carries the sector name; obstacles stay empty.
-    for top, left, bottom, right, name in ARENAS:
+    # Stamp sector + arena markers across each rectangle.
+    for idx, (top, left, bottom, right, _name) in enumerate(ARENAS):
+        marker = str(ARENA_MARKER_BASE + idx)
         for r in range(top, bottom):
             for c in range(left, right):
-                sector[r][c] = SECTOR
-                arena[r][c]  = name
+                sector[r][c] = str(SECTOR_MARKER)
+                arena[r][c]  = marker
 
-    for r, c, name, _arena in GAME_OBJECTS:
-        obj[r][c] = name
-        coll[r][c] = "X"  # objects are obstacles
+    for i, (r, c, _name, _arena) in enumerate(GAME_OBJECTS):
+        obj[r][c]  = str(OBJECT_MARKER_BASE + i)
+        coll[r][c] = str(COLLISION_MARKER)  # objects are obstacles
 
-    for r, c, name in SPAWNS:
-        spawn[r][c] = name
+    for i, (r, c, _name) in enumerate(SPAWNS):
+        spawn[r][c] = str(SPAWN_MARKER_BASE + i)
 
     # Border collisions
     for r in range(HEIGHT):
-        coll[r][0] = "X"
-        coll[r][WIDTH - 1] = "X"
+        coll[r][0] = str(COLLISION_MARKER)
+        coll[r][WIDTH - 1] = str(COLLISION_MARKER)
     for c in range(WIDTH):
-        coll[0][c] = "X"
-        coll[HEIGHT - 1][c] = "X"
+        coll[0][c] = str(COLLISION_MARKER)
+        coll[HEIGHT - 1][c] = str(COLLISION_MARKER)
 
     _write_csv(OUT / "maze/sector_maze.csv",            sector)
     _write_csv(OUT / "maze/arena_maze.csv",             arena)
@@ -100,18 +113,26 @@ def build() -> None:
     _write_csv(OUT / "maze/spawning_location_maze.csv", spawn)
     _write_csv(OUT / "maze/collision_maze.csv",         coll)
 
-    # special_blocks
+    # special_blocks: one block-marker per line; columns are
+    # marker, world[, sector[, arena[, name]]]
     sb = OUT / "special_blocks"
     sb.mkdir(parents=True, exist_ok=True)
-    (sb / "world_blocks.csv").write_text(f"25280, {WORLD_NAME}\n")
-    (sb / "sector_blocks.csv").write_text(f"25281, {WORLD_NAME}, {SECTOR}\n")
-    arena_lines = [f"{25282 + i}, {WORLD_NAME}, {SECTOR}, {a[4]}" for i, a in enumerate(ARENAS)]
+    (sb / "world_blocks.csv").write_text(f"{WORLD_MARKER}, {WORLD_NAME}\n")
+    (sb / "sector_blocks.csv").write_text(f"{SECTOR_MARKER}, {WORLD_NAME}, {SECTOR}\n")
+    arena_lines = [
+        f"{ARENA_MARKER_BASE + i}, {WORLD_NAME}, {SECTOR}, {a[4]}"
+        for i, a in enumerate(ARENAS)
+    ]
     (sb / "arena_blocks.csv").write_text("\n".join(arena_lines) + "\n")
-    obj_lines = []
-    for i, (_r, _c, name, arena_name) in enumerate(GAME_OBJECTS):
-        obj_lines.append(f"{32000 + i}, {WORLD_NAME}, {SECTOR}, {arena_name}, {name}")
+    obj_lines = [
+        f"{OBJECT_MARKER_BASE + i}, {WORLD_NAME}, {SECTOR}, {arena_name}, {name}"
+        for i, (_r, _c, name, arena_name) in enumerate(GAME_OBJECTS)
+    ]
     (sb / "game_object_blocks.csv").write_text("\n".join(obj_lines) + "\n")
-    spawn_lines = [f"{33000 + i}, {WORLD_NAME}, {SECTOR}, , {s[2]}" for i, s in enumerate(SPAWNS)]
+    spawn_lines = [
+        f"{SPAWN_MARKER_BASE + i}, {WORLD_NAME}, {SECTOR}, , {s[2]}"
+        for i, s in enumerate(SPAWNS)
+    ]
     (sb / "spawning_location_blocks.csv").write_text("\n".join(spawn_lines) + "\n")
 
     meta = {

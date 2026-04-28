@@ -37,6 +37,7 @@ from persona.persona import *
 from vending.events import bus as _vending_bus
 from vending.registry_adapter import TaskRegistryAdapter
 from vending.state import VendingState
+from vending.prompt_inject import attach_to_persona as _attach_vending_prompt
 from blockchain.config import load_config as _load_blockchain_config
 from blockchain.client import TaskRegistryClient
 from blockchain.mock import MockTaskRegistryClient
@@ -173,6 +174,7 @@ class ReverieServer:
       if vs_path.exists():
         persona.vending_state = VendingState.load(vs_path)
         persona._vending_state_path = vs_path
+        _attach_vending_prompt(persona)
 
     if any(getattr(p, "vending_state", None) for p in self.personas.values()):
       cfg = _load_blockchain_config(
