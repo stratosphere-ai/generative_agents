@@ -38,6 +38,7 @@ from vending.events import bus as _vending_bus
 from vending.registry_adapter import TaskRegistryAdapter
 from vending.state import VendingState
 from vending.prompt_inject import attach_to_persona as _attach_vending_prompt
+from vending.model_router import install as _install_model_router, with_persona as _with_persona
 from blockchain.config import load_config as _load_blockchain_config
 from blockchain.client import TaskRegistryClient
 from blockchain.mock import MockTaskRegistryClient
@@ -186,6 +187,7 @@ class ReverieServer:
         self._task_registry_client = TaskRegistryClient(cfg)
       self._task_registry_adapter = TaskRegistryAdapter(self._task_registry_client)
       self._task_registry_adapter.attach()
+      _install_model_router()
 
 
   def save(self):
@@ -404,15 +406,16 @@ class ReverieServer:
           # This is where the core brains of the personas are invoked. 
           movements = {"persona": dict(), 
                        "meta": dict()}
-          for persona_name, persona in self.personas.items(): 
+          for persona_name, persona in self.personas.items():
             # <next_tile> is a x,y coordinate. e.g., (58, 9)
             # <pronunciatio> is an emoji. e.g., "\ud83d\udca4"
-            # <description> is a string description of the movement. e.g., 
-            #   writing her next novel (editing her novel) 
+            # <description> is a string description of the movement. e.g.,
+            #   writing her next novel (editing her novel)
             #   @ double studio:double studio:common room:sofa
-            next_tile, pronunciatio, description = persona.move(
-              self.maze, self.personas, self.personas_tile[persona_name], 
-              self.curr_time)
+            with _with_persona(persona):
+              next_tile, pronunciatio, description = persona.move(
+                self.maze, self.personas, self.personas_tile[persona_name],
+                self.curr_time)
             movements["persona"][persona_name] = {}
             movements["persona"][persona_name]["movement"] = next_tile
             movements["persona"][persona_name]["pronunciatio"] = pronunciatio

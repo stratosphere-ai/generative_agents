@@ -1,1 +1,29 @@
-{}
+{
+  "kw_strength_event": {},
+  "kw_strength_thought": {
+    "self": 1,
+    "agent": 1,
+    "economic": 1,
+    "plaza": 1,
+    "inventory": 1,
+    "stock": 1,
+    "Coke": 1,
+    "Water": 1,
+    "Chips": 1,
+    "Chocolate": 1,
+    "Coffee": 1,
+    "revenue": 1,
+    "wallet": 1,
+    "chain": 2,
+    "TaskRegistry": 2,
+    "demand": 1,
+    "peak": 1,
+    "stockout": 1,
+    "schedule": 1,
+    "cafe": 1,
+    "competition": 1,
+    "pricing": 1,
+    "log": 1,
+    "audit": 1
+  }
+}

@@ -99,7 +99,7 @@
 	let pre_anims_direction;
 	let pre_anims_direction_dict = {};
 
-	let curr_maze = "the_ville";
+	let curr_maze = "{{ maze_name|default:'the_ville' }}";
 
 	// <tile_width> is the width of one individual tile (tiles are square)
 	let tile_width = 32;
@@ -166,8 +166,14 @@
 	  this.load.image("CuteRPG_Desert_B", "{% static 'assets/the_ville/visuals/map_assets/cute_rpg_word_VXAce/tilesets/CuteRPG_Desert_B.png' %}");
 	  this.load.image("CuteRPG_Forest_C", "{% static 'assets/the_ville/visuals/map_assets/cute_rpg_word_VXAce/tilesets/CuteRPG_Forest_C.png' %}");
 
-	  // Joon: This is the export json file you get from Tiled. 
+	  // Joon: This is the export json file you get from Tiled.
+	  // Per-maze override: if a {{ maze_name }}/visuals/<maze_name>.json exists
+	  // we load that; otherwise fall back to the_ville.
+	  {% if maze_name and maze_name != 'the_ville' %}
+	  this.load.tilemapTiledJSON("map", "{% static 'assets/' %}{{ maze_name }}/visuals/{{ maze_name }}.json");
+	  {% else %}
 	  this.load.tilemapTiledJSON("map", "{% static 'assets/the_ville/visuals/the_ville_jan7.json' %}");
+	  {% endif %}
 
 	  // An atlas is a way to pack multiple images together into one texture. I'm 
 	  // using it to load all the player animations (walking left, walking right, 

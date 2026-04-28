@@ -111,47 +111,20 @@ def home(request):
     template = "home/error_start_backend.html"
     return render(request, template, context)
 
-  with open(f_curr_sim_code) as json_file:  
+  with open(f_curr_sim_code) as json_file:
     sim_code = json.load(json_file)["sim_code"]
-  
-  with open(f_curr_step) as json_file:  
+
+  with open(f_curr_step) as json_file:
     step = json.load(json_file)["step"]
 
   os.remove(f_curr_step)
 
-  persona_names = []
-  persona_names_set = set()
-  for i in find_filenames(f"storage/{sim_code}/personas", ""): 
-    x = i.split("/")[-1].strip()
-    if x[0] != ".": 
-      persona_names += [[x, x.replace(" ", "_")]]
-      persona_names_set.add(x)
-
-  persona_init_pos = []
-  file_count = []
-  for i in find_filenames(f"storage/{sim_code}/environment", ".json"):
-    x = i.split("/")[-1].strip()
-    if x[0] != ".": 
-      file_count += [int(x.split(".")[0])]
-  curr_json = f'storage/{sim_code}/environment/{str(max(file_count))}.json'
-  with open(curr_json) as json_file:  
-    persona_init_pos_dict = json.load(json_file)
-    for key, val in persona_init_pos_dict.items(): 
-      if key in persona_names_set: 
-        persona_init_pos += [[key, val["x"], val["y"]]]
-
-  context = {"sim_code": sim_code,
-             "step": step, 
-             "persona_names": persona_names,
-             "persona_init_pos": persona_init_pos,
-             "mode": "simulate"}
-  template = "home/home.html"
-  return render(request, template, context)
-
-
-def replay(request, sim_code, step): 
-  sim_code = sim_code
-  step = int(step)
+  # maze_name lets the template pick the correct tilemap/visuals folder.
+  maze_name = "the_ville"
+  meta_path = f"storage/{sim_code}/reverie/meta.json"
+  if os.path.exists(meta_path):
+    with open(meta_path) as _f:
+      maze_name = json.load(_f).get("maze_name", "the_ville")
 
   persona_names = []
   persona_names_set = set()
@@ -177,7 +150,49 @@ def replay(request, sim_code, step):
   context = {"sim_code": sim_code,
              "step": step,
              "persona_names": persona_names,
-             "persona_init_pos": persona_init_pos, 
+             "persona_init_pos": persona_init_pos,
+             "maze_name": maze_name,
+             "mode": "simulate"}
+  template = "home/home.html"
+  return render(request, template, context)
+
+
+def replay(request, sim_code, step):
+  sim_code = sim_code
+  step = int(step)
+
+  persona_names = []
+  persona_names_set = set()
+  for i in find_filenames(f"storage/{sim_code}/personas", ""):
+    x = i.split("/")[-1].strip()
+    if x[0] != ".":
+      persona_names += [[x, x.replace(" ", "_")]]
+      persona_names_set.add(x)
+
+  persona_init_pos = []
+  file_count = []
+  for i in find_filenames(f"storage/{sim_code}/environment", ".json"):
+    x = i.split("/")[-1].strip()
+    if x[0] != ".":
+      file_count += [int(x.split(".")[0])]
+  curr_json = f'storage/{sim_code}/environment/{str(max(file_count))}.json'
+  with open(curr_json) as json_file:
+    persona_init_pos_dict = json.load(json_file)
+    for key, val in persona_init_pos_dict.items():
+      if key in persona_names_set:
+        persona_init_pos += [[key, val["x"], val["y"]]]
+
+  maze_name = "the_ville"
+  meta_path = f"storage/{sim_code}/reverie/meta.json"
+  if os.path.exists(meta_path):
+    with open(meta_path) as _f:
+      maze_name = json.load(_f).get("maze_name", "the_ville")
+
+  context = {"sim_code": sim_code,
+             "step": step,
+             "persona_names": persona_names,
+             "persona_init_pos": persona_init_pos,
+             "maze_name": maze_name,
              "mode": "replay"}
   template = "home/home.html"
   return render(request, template, context)
