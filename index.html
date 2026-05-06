@@ -1,0 +1,3366 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>城市微观公园沙盒</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #ecebe4;
+      --ink: #1f2928;
+      --muted: #626c6a;
+      --line: #c7c4b8;
+      --panel: #fbfaf4;
+      --accent: #2f7d62;
+      --accent-strong: #1f5f49;
+      --asphalt: #747b7b;
+      --curb: #d8d1c2;
+      --shadow: 0 18px 40px rgba(38, 43, 41, 0.18);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      font-family: Inter, "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
+      background:
+        linear-gradient(90deg, rgba(84, 91, 91, 0.16) 1px, transparent 1px),
+        linear-gradient(rgba(84, 91, 91, 0.13) 1px, transparent 1px),
+        linear-gradient(135deg, rgba(196, 77, 49, 0.08), transparent 28%),
+        var(--paper);
+      background-size: 32px 32px, 32px 32px, 100% 100%;
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    .app {
+      width: min(1480px, calc(100vw - 28px));
+      min-height: 100vh;
+      margin: 0 auto;
+      padding: 18px 0 22px;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 14px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 0 2px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(1.35rem, 2.2vw, 2.1rem);
+      line-height: 1.05;
+      letter-spacing: 0;
+    }
+
+    .meta {
+      min-width: 180px;
+      text-align: right;
+      color: var(--muted);
+      font-size: 0.92rem;
+      white-space: nowrap;
+    }
+
+    .workspace {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: 270px minmax(0, 1fr) 310px;
+      gap: 16px;
+      align-items: stretch;
+    }
+
+    .tools,
+    .dashboard {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+      border-radius: 8px;
+      padding: 14px;
+      min-width: 0;
+    }
+
+    .tools {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .dashboard {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .tool-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .tool {
+      min-width: 0;
+      border: 1px solid #d7d0bd;
+      background: #fbfaf4;
+      color: var(--ink);
+      border-radius: 7px;
+      padding: 9px 8px;
+      display: grid;
+      grid-template-columns: 22px minmax(0, 1fr);
+      align-items: center;
+      gap: 7px;
+      cursor: pointer;
+      transition: transform 140ms ease, border-color 140ms ease, background 140ms ease;
+    }
+
+    .tool:hover {
+      transform: translateY(-1px);
+      border-color: #a4b59c;
+    }
+
+    .tool.active {
+      border-color: var(--accent-strong);
+      background: #edf6ef;
+      box-shadow: inset 0 0 0 1px rgba(31, 95, 73, 0.18);
+    }
+
+    .swatch {
+      width: 22px;
+      height: 22px;
+      border: 2px solid rgba(33, 49, 44, 0.18);
+      border-radius: 5px;
+      display: inline-block;
+      position: relative;
+      overflow: hidden;
+      background: #8fca72;
+    }
+
+    .swatch.path {
+      background:
+        linear-gradient(135deg, rgba(117, 93, 62, 0.16) 25%, transparent 25% 50%, rgba(117, 93, 62, 0.16) 50% 75%, transparent 75%),
+        #d4be8b;
+      background-size: 9px 9px;
+    }
+
+    .swatch.plaza {
+      background:
+        linear-gradient(90deg, rgba(90, 88, 82, 0.24) 1px, transparent 1px),
+        linear-gradient(rgba(90, 88, 82, 0.24) 1px, transparent 1px),
+        #c7c0b1;
+      background-size: 8px 8px;
+    }
+
+    .swatch.water {
+      background:
+        radial-gradient(circle at 30% 35%, #d1f1ff 0 2px, transparent 3px),
+        #58a7d3;
+    }
+
+    .swatch.tree {
+      background:
+        radial-gradient(circle at 50% 45%, #2d8548 0 8px, transparent 9px),
+        linear-gradient(#8d613d, #8d613d);
+      background-size: 100% 100%, 5px 14px;
+      background-position: center, center 9px;
+      background-repeat: no-repeat;
+    }
+
+    .swatch.flower {
+      background:
+        radial-gradient(circle at 50% 50%, #ffd658 0 2px, transparent 3px),
+        radial-gradient(circle at 35% 35%, #e34f71 0 4px, transparent 5px),
+        radial-gradient(circle at 65% 35%, #ef775d 0 4px, transparent 5px),
+        radial-gradient(circle at 50% 67%, #7bbd57 0 5px, transparent 6px),
+        #8fca72;
+    }
+
+    .swatch.bench {
+      background:
+        linear-gradient(#875331 0 4px, transparent 4px 8px, #875331 8px 12px, transparent 12px),
+        linear-gradient(90deg, transparent 0 4px, #3d483f 4px 7px, transparent 7px 15px, #3d483f 15px 18px, transparent 18px),
+        #e5cf97;
+    }
+
+    .swatch.lamp {
+      background:
+        radial-gradient(circle at 50% 22%, #ffd96a 0 5px, transparent 6px),
+        linear-gradient(90deg, transparent 0 9px, #424a48 9px 13px, transparent 13px),
+        #8fca72;
+    }
+
+    .swatch.rock {
+      background:
+        radial-gradient(ellipse at 48% 56%, #8d9690 0 9px, #69736d 10px 12px, transparent 13px),
+        #8fca72;
+    }
+
+    .swatch.trash {
+      background:
+        linear-gradient(90deg, transparent 0 6px, #316a68 6px 17px, transparent 17px),
+        linear-gradient(#e6d66e 0 4px, transparent 4px),
+        #c7c0b1;
+    }
+
+    .swatch.sign {
+      background:
+        linear-gradient(90deg, transparent 0 10px, #3f4945 10px 13px, transparent 13px),
+        linear-gradient(transparent 0 4px, #f3f0df 4px 13px, transparent 13px),
+        #8fca72;
+    }
+
+    .swatch.vending {
+      background:
+        linear-gradient(90deg, transparent 0 5px, #c94334 5px 17px, #263744 17px 21px, transparent 21px),
+        linear-gradient(transparent 0 5px, #f6e16d 5px 10px, transparent 10px),
+        #c7c0b1;
+    }
+
+    .swatch.supplier,
+    .swatch.logistics,
+    .swatch.bank,
+    .swatch.office,
+    .swatch.school,
+    .swatch.park-office,
+    .swatch.repair,
+    .swatch.recycle {
+      background:
+        linear-gradient(transparent 0 5px, rgba(255, 255, 255, 0.7) 5px 8px, transparent 8px 12px, rgba(255, 255, 255, 0.45) 12px 15px, transparent 15px),
+        linear-gradient(90deg, transparent 0 5px, var(--swatch-building, #697d8a) 5px 18px, transparent 18px),
+        #c7c0b1;
+    }
+
+    .swatch.supplier { --swatch-building: #9b6e57; }
+    .swatch.logistics { --swatch-building: #6e8581; }
+    .swatch.bank { --swatch-building: #b49458; }
+    .swatch.office { --swatch-building: #697d8a; }
+    .swatch.school { --swatch-building: #8f785f; }
+    .swatch.park-office { --swatch-building: #76806d; }
+    .swatch.repair { --swatch-building: #6d7482; }
+    .swatch.recycle { --swatch-building: #4f876b; }
+
+    .swatch.erase {
+      background:
+        linear-gradient(45deg, transparent 0 44%, #bd4d44 44% 56%, transparent 56%),
+        #f5eee2;
+    }
+
+    .tool-label {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 0.95rem;
+    }
+
+    .control-group {
+      border-top: 1px solid var(--line);
+      padding-top: 14px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .control-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .range {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+
+    .actions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .action {
+      border: 1px solid #cfc7b4;
+      background: #f9f7ef;
+      color: var(--ink);
+      border-radius: 7px;
+      padding: 9px 6px;
+      cursor: pointer;
+      min-height: 40px;
+    }
+
+    .action.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .action:disabled {
+      opacity: 0.42;
+      cursor: not-allowed;
+    }
+
+    .toggle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .toggle input {
+      width: 42px;
+      height: 22px;
+      margin: 0;
+      appearance: none;
+      border: 1px solid #b9c3b4;
+      border-radius: 999px;
+      background: #e1ded1;
+      position: relative;
+      cursor: pointer;
+    }
+
+    .toggle input::before {
+      content: "";
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      top: 1px;
+      left: 1px;
+      border-radius: 50%;
+      background: #fffdf8;
+      box-shadow: 0 1px 4px rgba(33, 49, 44, 0.22);
+      transition: transform 140ms ease;
+    }
+
+    .toggle input:checked {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+
+    .toggle input:checked::before {
+      transform: translateX(20px);
+    }
+
+    .economy-panel {
+      display: grid;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .economy-head,
+    .metric,
+    .stock-row,
+    .agent-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .economy-head {
+      font-weight: 700;
+    }
+
+    .action.mini {
+      min-height: 32px;
+      padding: 6px 10px;
+      white-space: nowrap;
+    }
+
+    .economy-status {
+      min-height: 36px;
+      border-left: 3px solid var(--accent);
+      padding: 7px 9px;
+      background: #eef4ef;
+      color: #34433e;
+      font-size: 0.86rem;
+      line-height: 1.25;
+    }
+
+    .economy-grid {
+      display: grid;
+      gap: 8px;
+    }
+
+    .metric,
+    .agent-row {
+      color: var(--muted);
+      font-size: 0.88rem;
+    }
+
+    .metric strong,
+    .agent-row strong {
+      color: var(--ink);
+      font-size: 0.92rem;
+      white-space: nowrap;
+    }
+
+    .stock-list,
+    .agent-list {
+      display: grid;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .agent-list {
+      max-height: 268px;
+      overflow: auto;
+      padding-right: 2px;
+    }
+
+    .stock-row {
+      display: grid;
+      grid-template-columns: 76px minmax(0, 1fr) 36px;
+      color: var(--muted);
+      font-size: 0.82rem;
+    }
+
+    .stock-bar {
+      height: 8px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: #dfdbcf;
+    }
+
+    .stock-fill {
+      height: 100%;
+      width: 50%;
+      background: #2f7d62;
+      border-radius: inherit;
+      transition: width 180ms ease;
+    }
+
+    .agent-name {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .agent-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      flex: 0 0 auto;
+      background: #2f7d62;
+    }
+
+    .ai-section {
+      border-top: 1px solid var(--line);
+      padding-top: 12px;
+      display: grid;
+      gap: 9px;
+      min-width: 0;
+    }
+
+    .ai-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      font-weight: 700;
+    }
+
+    .ai-controls {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .ai-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .ai-card {
+      min-width: 0;
+      border: 1px solid #ddd6c6;
+      border-radius: 7px;
+      background: #f9f7ef;
+      padding: 8px;
+      display: grid;
+      gap: 3px;
+    }
+
+    .ai-card span,
+    .ai-list li {
+      color: var(--muted);
+      font-size: 0.78rem;
+      line-height: 1.25;
+    }
+
+    .ai-card strong {
+      color: var(--ink);
+      font-size: 0.9rem;
+      line-height: 1.15;
+      overflow-wrap: anywhere;
+    }
+
+    .ai-list {
+      display: grid;
+      gap: 6px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      min-width: 0;
+    }
+
+    .ai-list li {
+      border-left: 3px solid #cfc7b4;
+      background: #f9f7ef;
+      padding: 6px 8px;
+      min-width: 0;
+    }
+
+    .ai-list.decisions li {
+      border-left-color: var(--accent);
+      color: #34433e;
+    }
+
+    .reasoning-window {
+      border: 1px solid #d8d0bd;
+      border-radius: 7px;
+      background: #fffdf7;
+      display: grid;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .reasoning-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 8px 9px;
+      border-bottom: 1px solid #e4decf;
+      background: #f5f1e6;
+      font-size: 0.84rem;
+      font-weight: 700;
+    }
+
+    .reasoning-head strong {
+      color: var(--accent-strong);
+      font-size: 0.78rem;
+      white-space: nowrap;
+    }
+
+    .reasoning-log {
+      max-height: 220px;
+      overflow: auto;
+      display: grid;
+      gap: 7px;
+      padding: 8px;
+    }
+
+    .reasoning-step {
+      display: grid;
+      gap: 3px;
+      border-left: 3px solid #b49458;
+      background: #f9f7ef;
+      padding: 7px 8px;
+    }
+
+    .reasoning-step strong {
+      color: var(--ink);
+      font-size: 0.8rem;
+    }
+
+    .reasoning-step span {
+      color: var(--muted);
+      font-size: 0.78rem;
+      line-height: 1.28;
+    }
+
+    .sla-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .sla-card {
+      min-width: 0;
+      border: 1px solid #ddd6c6;
+      border-radius: 7px;
+      background: #f9f7ef;
+      padding: 8px;
+      display: grid;
+      gap: 3px;
+    }
+
+    .sla-card span,
+    .audit-item span {
+      color: var(--muted);
+      font-size: 0.78rem;
+      line-height: 1.25;
+    }
+
+    .sla-card strong {
+      color: var(--ink);
+      font-size: 0.9rem;
+      line-height: 1.15;
+      overflow-wrap: anywhere;
+    }
+
+    .audit-list {
+      display: grid;
+      gap: 7px;
+      max-height: 230px;
+      overflow: auto;
+    }
+
+    .audit-item {
+      border-left: 3px solid #4f876b;
+      background: #f9f7ef;
+      padding: 7px 8px;
+      display: grid;
+      gap: 3px;
+      min-width: 0;
+    }
+
+    .audit-item strong {
+      color: var(--ink);
+      font-size: 0.8rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .environment-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .environment-card {
+      min-width: 0;
+      border: 1px solid #ddd6c6;
+      border-radius: 7px;
+      background: #f9f7ef;
+      padding: 8px;
+      display: grid;
+      gap: 3px;
+    }
+
+    .environment-card span {
+      color: var(--muted);
+      font-size: 0.78rem;
+    }
+
+    .environment-card strong {
+      color: var(--ink);
+      font-size: 0.9rem;
+      line-height: 1.15;
+      overflow-wrap: anywhere;
+    }
+
+    .report-list {
+      display: grid;
+      gap: 7px;
+      max-height: 240px;
+      overflow: auto;
+    }
+
+    .report-item {
+      border-left: 3px solid #697d8a;
+      background: #f9f7ef;
+      padding: 8px;
+      display: grid;
+      gap: 4px;
+      min-width: 0;
+    }
+
+    .report-item strong {
+      color: var(--ink);
+      font-size: 0.82rem;
+    }
+
+    .report-item span {
+      color: var(--muted);
+      font-size: 0.78rem;
+      line-height: 1.28;
+    }
+
+    .stage-wrap {
+      min-width: 0;
+      position: relative;
+      background:
+        linear-gradient(#a9b1b0 0 18px, transparent 18px),
+        linear-gradient(90deg, #747b7b 0 10%, #d8d1c2 10% 13%, transparent 13% 87%, #d8d1c2 87% 90%, #747b7b 90%),
+        #d5d0c2;
+      border: 1px solid #aeb0aa;
+      box-shadow: var(--shadow);
+      border-radius: 8px;
+      padding: 38px 24px 30px;
+      display: grid;
+      align-content: center;
+      justify-items: center;
+      overflow: hidden;
+    }
+
+    .stage-wrap::before {
+      content: "";
+      position: absolute;
+      inset: 0 0 auto;
+      height: 54px;
+      background:
+        linear-gradient(90deg,
+          #7f897f 0 8%, transparent 8% 10%,
+          #9b6e57 10% 18%, transparent 18% 21%,
+          #697d8a 21% 30%, transparent 30% 34%,
+          #b49458 34% 42%, transparent 42% 47%,
+          #76806d 47% 56%, transparent 56% 61%,
+          #8f785f 61% 70%, transparent 70% 74%,
+          #6e8581 74% 84%, transparent 84% 88%,
+          #a26f5a 88% 96%, transparent 96%);
+      opacity: 0.65;
+      clip-path: polygon(0 42%, 8% 42%, 8% 20%, 18% 20%, 18% 34%, 30% 34%, 30% 12%, 42% 12%, 42% 28%, 56% 28%, 56% 18%, 70% 18%, 70% 38%, 84% 38%, 84% 16%, 96% 16%, 96% 42%, 100% 42%, 100% 100%, 0 100%);
+    }
+
+    .stage-wrap::after {
+      content: "";
+      position: absolute;
+      inset: auto 0 0;
+      height: 24px;
+      background:
+        repeating-linear-gradient(90deg, transparent 0 24px, rgba(255, 239, 135, 0.7) 24px 46px, transparent 46px 72px),
+        var(--asphalt);
+    }
+
+    canvas {
+      width: 100%;
+      max-width: 1216px;
+      height: auto;
+      aspect-ratio: 38 / 24;
+      display: block;
+      image-rendering: pixelated;
+      border-radius: 6px;
+      border: 4px solid var(--curb);
+      background: #8fca72;
+      box-shadow: 0 10px 22px rgba(38, 43, 41, 0.22);
+      touch-action: none;
+      cursor: crosshair;
+      position: relative;
+      z-index: 1;
+    }
+
+    @media (max-width: 820px) {
+      .app {
+        width: min(100vw - 20px, 700px);
+        padding-top: 12px;
+      }
+
+      .topbar {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .meta {
+        text-align: left;
+      }
+
+      .workspace {
+        grid-template-columns: 1fr;
+      }
+
+      .tools {
+        order: 2;
+      }
+
+      .dashboard {
+        order: 3;
+      }
+
+      .tool-grid,
+      .actions {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+
+      .tool {
+        grid-template-columns: 1fr;
+        justify-items: center;
+        padding: 8px 4px;
+      }
+
+      .tool-label {
+        font-size: 0.82rem;
+        white-space: normal;
+        text-align: center;
+        line-height: 1.15;
+      }
+    }
+
+    @media (min-width: 821px) and (max-width: 1280px) {
+      .workspace {
+        grid-template-columns: 270px minmax(0, 1fr);
+      }
+
+      .dashboard {
+        grid-column: 1 / -1;
+      }
+
+      .dashboard .economy-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+
+      .dashboard .stock-list {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .dashboard .agent-list {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        max-height: 190px;
+      }
+    }
+
+    @media (max-width: 520px) {
+      .tool-grid,
+      .actions {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .stage-wrap {
+        padding: 7px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header class="topbar">
+      <h1>城市微观公园沙盒</h1>
+      <div class="meta" id="summary">38 x 24</div>
+    </header>
+
+    <section class="workspace" aria-label="城市公园编辑器">
+      <aside class="tools" aria-label="工具">
+        <div class="tool-grid" id="toolGrid"></div>
+
+        <div class="control-group">
+          <div class="control-row">
+            <span>笔刷</span>
+            <strong id="brushValue">1</strong>
+          </div>
+          <input class="range" id="brushSize" type="range" min="1" max="4" value="1" aria-label="笔刷大小">
+        </div>
+
+        <div class="control-group actions">
+          <button class="action" id="undoButton" type="button">撤销</button>
+          <button class="action primary" id="randomButton" type="button">随机</button>
+          <button class="action" id="clearButton" type="button">清空</button>
+          <button class="action" id="fillButton" type="button">铺草</button>
+        </div>
+
+        <label class="toggle">
+          <span>网格</span>
+          <input id="gridToggle" type="checkbox" checked aria-label="显示网格">
+        </label>
+      </aside>
+
+      <div class="stage-wrap">
+        <canvas id="parkCanvas" width="1216" height="768" aria-label="城市微观公园画布"></canvas>
+      </div>
+
+      <aside class="dashboard" aria-label="自动贩卖机经济看板">
+        <div class="economy-panel">
+          <div class="economy-head">
+            <span>贩卖机经济</span>
+            <button class="action mini" id="economyToggle" type="button">暂停</button>
+          </div>
+          <div class="economy-status" id="economyStatus">等待自动贩卖机</div>
+          <div class="ai-section" aria-label="城市环境系统">
+            <div class="ai-title">
+              <span>城市环境</span>
+              <strong id="simClockValue">周一 08:00</strong>
+            </div>
+            <div class="environment-grid" id="environmentGrid"></div>
+          </div>
+          <div class="economy-grid">
+            <div class="metric">
+              <span>收入</span>
+              <strong id="revenueValue">¥0.00</strong>
+            </div>
+            <div class="metric">
+              <span>成交</span>
+              <strong id="salesValue">0</strong>
+            </div>
+            <div class="metric">
+              <span>利润</span>
+              <strong id="profitValue">¥0.00</strong>
+            </div>
+            <div class="metric">
+              <span>经营现金</span>
+              <strong id="operatorCashValue">¥0.00</strong>
+            </div>
+            <div class="metric">
+              <span>贷款</span>
+              <strong id="loanValue">¥0.00</strong>
+            </div>
+            <div class="metric">
+              <span>健康</span>
+              <strong id="healthValue">100</strong>
+            </div>
+            <div class="metric">
+              <span>垃圾</span>
+              <strong id="trashValue">0</strong>
+            </div>
+            <div class="metric">
+              <span>活跃代理</span>
+              <strong id="agentCountValue">0</strong>
+            </div>
+          </div>
+          <div class="ai-section" aria-label="自动贩卖机 AI Agent">
+            <div class="ai-title">
+              <span>Vending AI</span>
+              <strong id="aiStateValue">观测中</strong>
+            </div>
+            <div class="ai-controls">
+              <button class="action mini" id="aiToggleButton" type="button">AI 自动</button>
+              <button class="action mini" id="aiStrategyButton" type="button">平衡</button>
+            </div>
+            <div class="ai-grid" id="aiObservationGrid"></div>
+            <ul class="ai-list decisions" id="aiDecisionList"></ul>
+            <div class="reasoning-window" aria-label="LLM 推理观察窗口">
+              <div class="reasoning-head">
+                <span>LLM 推理观察</span>
+                <strong id="llmModeValue">规则模拟</strong>
+              </div>
+              <div class="reasoning-log" id="aiReasoningTrace"></div>
+            </div>
+            <div class="reasoning-window" aria-label="SLA 风险护栏">
+              <div class="reasoning-head">
+                <span>SLA 风险护栏</span>
+                <strong id="slaModeValue">保险生效</strong>
+              </div>
+              <div class="sla-grid" id="slaGrid"></div>
+            </div>
+            <div class="reasoning-window" aria-label="链上决策审计">
+              <div class="reasoning-head">
+                <span>Decision Audit Trail</span>
+                <strong id="auditHeightValue">#0</strong>
+              </div>
+              <div class="audit-list" id="auditTrailList"></div>
+            </div>
+            <div class="reasoning-window" aria-label="日报监视窗口">
+              <div class="reasoning-head">
+                <span>日报监视</span>
+                <strong id="dailyReportStatus">等待午夜</strong>
+              </div>
+              <div class="report-list" id="dailyReportList"></div>
+            </div>
+            <ul class="ai-list" id="aiMemoryList"></ul>
+          </div>
+          <div class="stock-list" id="stockList"></div>
+          <div class="agent-list" id="agentList"></div>
+          <button class="action" id="resetEconomyButton" type="button">重置经济</button>
+        </div>
+      </aside>
+    </section>
+  </main>
+
+  <script>
+    const columns = 38;
+    const rows = 24;
+    const tile = 32;
+    const canvas = document.querySelector("#parkCanvas");
+    const ctx = canvas.getContext("2d");
+    const toolGrid = document.querySelector("#toolGrid");
+    const brushInput = document.querySelector("#brushSize");
+    const brushValue = document.querySelector("#brushValue");
+    const undoButton = document.querySelector("#undoButton");
+    const randomButton = document.querySelector("#randomButton");
+    const clearButton = document.querySelector("#clearButton");
+    const fillButton = document.querySelector("#fillButton");
+    const gridToggle = document.querySelector("#gridToggle");
+    const summary = document.querySelector("#summary");
+    const economyToggle = document.querySelector("#economyToggle");
+    const resetEconomyButton = document.querySelector("#resetEconomyButton");
+    const economyStatus = document.querySelector("#economyStatus");
+    const simClockValue = document.querySelector("#simClockValue");
+    const environmentGrid = document.querySelector("#environmentGrid");
+    const revenueValue = document.querySelector("#revenueValue");
+    const salesValue = document.querySelector("#salesValue");
+    const profitValue = document.querySelector("#profitValue");
+    const operatorCashValue = document.querySelector("#operatorCashValue");
+    const loanValue = document.querySelector("#loanValue");
+    const healthValue = document.querySelector("#healthValue");
+    const trashValue = document.querySelector("#trashValue");
+    const agentCountValue = document.querySelector("#agentCountValue");
+    const aiStateValue = document.querySelector("#aiStateValue");
+    const aiToggleButton = document.querySelector("#aiToggleButton");
+    const aiStrategyButton = document.querySelector("#aiStrategyButton");
+    const aiObservationGrid = document.querySelector("#aiObservationGrid");
+    const aiDecisionList = document.querySelector("#aiDecisionList");
+    const aiReasoningTrace = document.querySelector("#aiReasoningTrace");
+    const llmModeValue = document.querySelector("#llmModeValue");
+    const slaModeValue = document.querySelector("#slaModeValue");
+    const slaGrid = document.querySelector("#slaGrid");
+    const auditHeightValue = document.querySelector("#auditHeightValue");
+    const auditTrailList = document.querySelector("#auditTrailList");
+    const dailyReportStatus = document.querySelector("#dailyReportStatus");
+    const dailyReportList = document.querySelector("#dailyReportList");
+    const aiMemoryList = document.querySelector("#aiMemoryList");
+    const stockList = document.querySelector("#stockList");
+    const agentList = document.querySelector("#agentList");
+
+    const tools = [
+      { id: "grass", label: "草地", kind: "terrain", swatch: "grass" },
+      { id: "path", label: "步道", kind: "terrain", swatch: "path" },
+      { id: "plaza", label: "广场砖", kind: "terrain", swatch: "plaza" },
+      { id: "water", label: "景观水", kind: "terrain", swatch: "water" },
+      { id: "tree", label: "行道树", kind: "object", swatch: "tree" },
+      { id: "flower", label: "花", kind: "object", swatch: "flower" },
+      { id: "bench", label: "长椅", kind: "object", swatch: "bench" },
+      { id: "lamp", label: "街灯", kind: "object", swatch: "lamp" },
+      { id: "rock", label: "石头", kind: "object", swatch: "rock" },
+      { id: "trash", label: "垃圾桶", kind: "object", swatch: "trash" },
+      { id: "sign", label: "导视牌", kind: "object", swatch: "sign" },
+      { id: "vending", label: "贩卖机", kind: "object", swatch: "vending" },
+      { id: "supplier", label: "供货仓", kind: "object", swatch: "supplier" },
+      { id: "logistics", label: "物流站", kind: "object", swatch: "logistics" },
+      { id: "bank", label: "银行", kind: "object", swatch: "bank" },
+      { id: "office", label: "办公楼", kind: "object", swatch: "office" },
+      { id: "school", label: "学校", kind: "object", swatch: "school" },
+      { id: "parkOffice", label: "管理处", kind: "object", swatch: "park-office" },
+      { id: "repairShop", label: "维修点", kind: "object", swatch: "repair" },
+      { id: "recycleCenter", label: "回收点", kind: "object", swatch: "recycle" },
+      { id: "erase", label: "橡皮", kind: "erase", swatch: "erase" }
+    ];
+
+    const terrainColors = {
+      grass: "#8fca72",
+      path: "#d4be8b",
+      plaza: "#c7c0b1",
+      water: "#58a7d3"
+    };
+
+    const buildingStyles = {
+      supplier: { color: "#9b6e57", roof: "#6f493b", label: "供" },
+      logistics: { color: "#6e8581", roof: "#466865", label: "运" },
+      bank: { color: "#b49458", roof: "#8c703e", label: "行" },
+      office: { color: "#697d8a", roof: "#465a65", label: "办" },
+      school: { color: "#8f785f", roof: "#6b563f", label: "学" },
+      parkOffice: { color: "#76806d", roof: "#526548", label: "管" },
+      repairShop: { color: "#6d7482", roof: "#505967", label: "修" },
+      recycleCenter: { color: "#4f876b", roof: "#35644d", label: "回" }
+    };
+
+    const productCatalog = [
+      { id: "water", label: "水", price: 3, cost: 1, maxStock: 18, color: "#58a7d3" },
+      { id: "tea", label: "茶", price: 4, cost: 1.4, maxStock: 14, color: "#7ab45d" },
+      { id: "snack", label: "点心", price: 5, cost: 2, maxStock: 12, color: "#d9a441" }
+    ];
+
+    const strategyModes = [
+      { id: "balanced", label: "平衡", lowStock: 0.36, priceBias: 1 },
+      { id: "profit", label: "保利润", lowStock: 0.28, priceBias: 1.08 },
+      { id: "stock", label: "保库存", lowStock: 0.48, priceBias: 0.98 },
+      { id: "clearance", label: "清库存", lowStock: 0.22, priceBias: 0.9 }
+    ];
+
+    const weatherTypes = [
+      { id: "sunny", label: "晴", demand: 1.08, traffic: 1.05, water: 1.12, color: "rgba(255, 220, 94, 0.12)" },
+      { id: "cloudy", label: "多云", demand: 1, traffic: 1, water: 1, color: "rgba(180, 190, 190, 0.11)" },
+      { id: "rain", label: "雨", demand: 0.76, traffic: 0.58, water: 0.78, color: "rgba(70, 112, 148, 0.18)" },
+      { id: "heat", label: "高温", demand: 1.24, traffic: 0.92, water: 1.55, color: "rgba(217, 104, 61, 0.14)" },
+      { id: "cold", label: "寒冷", demand: 0.9, traffic: 0.82, water: 0.7, color: "rgba(122, 163, 201, 0.15)" }
+    ];
+
+    const seasonTypes = [
+      { id: "spring", label: "春", traffic: 1.08, water: 1, snack: 1 },
+      { id: "summer", label: "夏", traffic: 1.12, water: 1.4, snack: 0.96 },
+      { id: "autumn", label: "秋", traffic: 1.02, water: 0.95, snack: 1.08 },
+      { id: "winter", label: "冬", traffic: 0.82, water: 0.74, snack: 1.03 }
+    ];
+
+    const socialSchedules = {
+      office: { label: "办公", open: 9, close: 17 },
+      bank: { label: "银行", open: 9, close: 16 },
+      school: { label: "学校", open: 8, close: 15.5 },
+      supplier: { label: "供货", open: 7, close: 18 },
+      logistics: { label: "物流", open: 7, close: 20 },
+      park: { label: "公园", open: 5, close: 23 }
+    };
+
+    const roleTemplates = [
+      { role: "上班族", type: "consumer", color: "#2f628a", budget: 18, demand: 0.55, preference: ["tea", "water"], home: "office", entry: "west" },
+      { role: "学生", type: "consumer", color: "#ba4e6a", budget: 12, demand: 0.72, preference: ["snack", "water"], home: "school", entry: "south" },
+      { role: "游客", type: "consumer", color: "#7c5bb2", budget: 22, demand: 0.62, preference: ["water", "tea"], home: "parkOffice", entry: "east" },
+      { role: "跑步者", type: "consumer", color: "#d36d3b", budget: 10, demand: 0.8, preference: ["water"], home: "parkOffice", entry: "north" },
+      { role: "经营者", type: "operator", color: "#4d6f9f", budget: 0, demand: 0, preference: [], home: "office", entry: "west" },
+      { role: "供货商", type: "supplier", color: "#9b6e57", budget: 0, demand: 0, preference: [], home: "supplier", entry: "west" },
+      { role: "物流员", type: "logistics", color: "#3f8f8a", budget: 0, demand: 0, preference: [], home: "logistics", entry: "west" },
+      { role: "银行员", type: "banker", color: "#b49458", budget: 0, demand: 0, preference: [], home: "bank", entry: "south" },
+      { role: "公园管理", type: "manager", color: "#5f7d58", budget: 0, demand: 0, preference: [], home: "parkOffice", entry: "north" },
+      { role: "维修员", type: "repair", color: "#6d7482", budget: 0, demand: 0, preference: [], home: "repairShop", entry: "east" },
+      { role: "清洁员", type: "cleaner", color: "#4f876b", budget: 0, demand: 0, preference: [], home: "recycleCenter", entry: "east" },
+      { role: "雇主", type: "employer", color: "#697d8a", budget: 0, demand: 0, preference: [], home: "office", entry: "west" }
+    ];
+
+    const storageKey = "micro-city-block-park-state";
+    const buildingObjects = ["supplier", "logistics", "bank", "office", "school", "parkOffice", "repairShop", "recycleCenter"];
+    const saved = readStoredPark();
+    let currentTool = "tree";
+    let showGrid = true;
+    let undoStack = [];
+    let drawing = false;
+    let lastPainted = "";
+    let park = saved ? safeParse(saved) : createPark();
+    let economyRunning = true;
+    let lastFrameTime = performance.now();
+    let lastEconomyUiUpdate = 0;
+    let economy = createEconomy();
+    let agents = createAgents();
+    let vendingAgent = createVendingAgent();
+    let environment = createEnvironment();
+
+    function readStoredPark() {
+      try {
+        return window.localStorage.getItem(storageKey);
+      } catch (error) {
+        return null;
+      }
+    }
+
+    function safeParse(value) {
+      try {
+        const parsed = JSON.parse(value);
+        if (Array.isArray(parsed) && parsed.length === rows && parsed.every((row) => row.length === columns)) {
+          return parsed;
+        }
+      } catch (error) {
+        return createPark();
+      }
+      return createPark();
+    }
+
+    function createPark() {
+      return Array.from({ length: rows }, () =>
+        Array.from({ length: columns }, () => ({ terrain: "grass", object: null }))
+      );
+    }
+
+    function clonePark(source = park) {
+      return source.map((row) => row.map((cell) => ({ ...cell })));
+    }
+
+    function savePark() {
+      try {
+        window.localStorage.setItem(storageKey, JSON.stringify(park));
+      } catch (error) {
+        return;
+      }
+    }
+
+    function createEconomy() {
+      const economyState = {
+        revenue: 0,
+        costs: 0,
+        sales: 0,
+        missedSales: 0,
+        stock: Object.fromEntries(productCatalog.map((product) => [product.id, product.maxStock])),
+        sold: Object.fromEntries(productCatalog.map((product) => [product.id, 0])),
+        recentSold: Object.fromEntries(productCatalog.map((product) => [product.id, 0])),
+        prices: Object.fromEntries(productCatalog.map((product) => [product.id, product.price])),
+        priceLastChangedAt: Object.fromEntries(productCatalog.map((product) => [product.id, -24])),
+        priceChangesToday: Object.fromEntries(productCatalog.map((product) => [product.id, 0])),
+        priceGovernance: {
+          minIntervalHours: 12,
+          maxDailyChanges: 1,
+          maxSingleChangeRate: 0.12,
+          lastAction: "价格处于稳定观察窗口。"
+        },
+        lastEvent: "市场空闲，等待第一笔交易。",
+        restockCooldown: 0,
+        operatorCash: 80,
+        supplierCash: 120,
+        supplierPayable: 0,
+        supplierSettlementDue: false,
+        supplierSettlementNoticeTimer: 0,
+        nextSupplierSettlementDay: 28,
+        supplierSettlements: [],
+        logisticsCash: 30,
+        bankCash: 500,
+        parkCash: 0,
+        wagesPaid: 0,
+        payrollIssuedDay: 0,
+        payrollNoticeTimer: 0,
+        loans: 0,
+        claimsPaid: 0,
+        dayStart: null,
+        dailyReports: [],
+        trash: 0,
+        health: 100,
+        rentTimer: 10,
+        wageTimer: 8,
+        settlementTimer: 6,
+        repairCooldown: 0
+      };
+      economyState.dayStart = snapshotEconomy(economyState, 0, 0);
+      return economyState;
+    }
+
+    function createVendingAgent() {
+      return {
+        enabled: true,
+        llmMode: "规则模拟",
+        state: "观测中",
+        strategy: "balanced",
+        observationTimer: 0,
+        decisionTimer: 0,
+        priceTimer: 0,
+        observations: {},
+        decisions: ["初始化经营策略"],
+        reasoningTrace: [
+          { label: "输入", text: "等待第一轮环境观测。" },
+          { label: "输出", text: "初始化经营策略。" }
+        ],
+        memory: ["Vending AI 上线，接管贩卖机经营。"],
+        learning: {
+          version: 1,
+          samples: 0,
+          confidence: 0.25,
+          restockBias: 1,
+          trafficSegments: {
+            commute: 1,
+            workday: 1,
+            lunch: 1,
+            afterWork: 1,
+            leisure: 1,
+            night: 0.45,
+            weekend: 1.1
+          },
+          lastInsight: "等待第一批客流样本。"
+        },
+        sla: {
+          enabled: true,
+          coveragePool: 120,
+          premiumPaid: 0,
+          blocked: 0,
+          claims: 0,
+          maxLoan: 140,
+          maxOrderCost: 48,
+          maxPriceChange: 0.45,
+          riskLimit: 72,
+          premiumTimer: 14,
+          lastAssessment: "SLA 保险护栏已启用。"
+        },
+        auditTrail: [],
+        actions: {
+          restockOrder: null,
+          repairRequested: false,
+          cleanRequested: false
+        }
+      };
+    }
+
+    function createEnvironment() {
+      return {
+        elapsedHours: 8,
+        day: 1,
+        hour: 8,
+        minute: 0,
+        weekday: 1,
+        season: "spring",
+        weather: "sunny",
+        holiday: "工作日",
+        trafficIndex: 1,
+        demandIndex: 1,
+        timeScale: 0.18,
+        weatherTimer: 5,
+        lastWeatherChange: "晴",
+        dailyTrafficVariance: Number((0.86 + Math.random() * 0.32).toFixed(2)),
+        trafficWave: Math.random() * Math.PI * 2,
+        dailyTrafficSamples: 0,
+        dailyTrafficTotal: 0,
+        dailyDemandTotal: 0,
+        dailyPeakTraffic: 0,
+        lastTrafficLearning: "等待客流样本",
+        previousDay: 1
+      };
+    }
+
+    function createAgents() {
+      return roleTemplates.map((template, index) => createAgent(template, index));
+    }
+
+    function createAgent(template, index) {
+      const point = objectPoint(template.home) || entrancePoint(template.entry);
+      return {
+        id: `${template.role}-${index}`,
+        role: template.role,
+        type: template.type,
+        color: template.color,
+        budget: template.budget + (template.type === "consumer" ? Math.floor(Math.random() * 7) : 0),
+        demand: template.demand,
+        preference: template.preference,
+        home: template.home,
+        x: point.x,
+        y: point.y,
+        target: randomParkPoint(),
+        state: template.type === "consumer" ? "闲逛" : "待命",
+        wait: Math.random() * 2,
+        cooldown: 2 + Math.random() * 5,
+        speed: template.type === "consumer" ? 46 + Math.random() * 18 : 58 + Math.random() * 22,
+        spent: 0
+      };
+    }
+
+    function entrancePoint(side) {
+      const entrances = {
+        west: { x: tile * 1.5, y: canvas.height / 2 },
+        east: { x: canvas.width - tile * 1.5, y: canvas.height / 2 },
+        north: { x: canvas.width / 2, y: tile * 1.5 },
+        south: { x: canvas.width / 2, y: canvas.height - tile * 1.5 }
+      };
+      return entrances[side] || entrances.west;
+    }
+
+    function randomParkPoint() {
+      const walkable = [];
+      for (let row = 0; row < rows; row += 1) {
+        for (let column = 0; column < columns; column += 1) {
+          const cell = park[row][column];
+          if (cell.terrain !== "water") walkable.push({ column, row });
+        }
+      }
+      const choice = walkable[Math.floor(Math.random() * walkable.length)] || { column: 1, row: 1 };
+      return cellCenter(choice.column, choice.row);
+    }
+
+    function cellCenter(column, row) {
+      return {
+        x: column * tile + tile / 2,
+        y: row * tile + tile / 2
+      };
+    }
+
+    function findVendingMachines() {
+      const machines = [];
+      for (let row = 0; row < rows; row += 1) {
+        for (let column = 0; column < columns; column += 1) {
+          if (park[row][column].object === "vending") machines.push({ column, row });
+        }
+      }
+      return machines;
+    }
+
+    function vendingPoint() {
+      const machine = findVendingMachines()[0];
+      if (!machine) return null;
+      return cellCenter(machine.column, machine.row);
+    }
+
+    function objectPoint(object) {
+      for (let row = 0; row < rows; row += 1) {
+        for (let column = 0; column < columns; column += 1) {
+          if (park[row][column].object === object) return cellCenter(column, row);
+        }
+      }
+      return null;
+    }
+
+    function agentHomePoint(agent) {
+      return objectPoint(agent.home) || randomParkPoint();
+    }
+
+    function ensureVendingMachine() {
+      if (findVendingMachines().length > 0) return false;
+      const candidates = [
+        { column: 18, row: 16 },
+        { column: 19, row: 16 },
+        { column: 18, row: 13 },
+        { column: 19, row: 13 }
+      ];
+      const target = candidates.find(({ column, row }) => park[row]?.[column]?.terrain !== "water") || firstNonWaterCell();
+      if (!target) return false;
+      park[target.row][target.column].terrain = "plaza";
+      park[target.row][target.column].object = "vending";
+      return true;
+    }
+
+    function firstNonWaterCell() {
+      for (let row = 0; row < rows; row += 1) {
+        for (let column = 0; column < columns; column += 1) {
+          if (park[row][column].terrain !== "water") return { column, row };
+        }
+      }
+      return null;
+    }
+
+    function resetEconomy(redraw = true, message = "") {
+      economy = createEconomy();
+      if (message) economy.lastEvent = message;
+      agents = createAgents();
+      vendingAgent = createVendingAgent();
+      environment = createEnvironment();
+      if (message) rememberAI(message);
+      if (redraw) draw();
+    }
+
+    function buildTools() {
+      toolGrid.innerHTML = "";
+      tools.forEach((tool) => {
+        const button = document.createElement("button");
+        button.className = `tool${tool.id === currentTool ? " active" : ""}`;
+        button.type = "button";
+        button.dataset.tool = tool.id;
+        button.setAttribute("aria-pressed", String(tool.id === currentTool));
+        button.innerHTML = `<span class="swatch ${tool.swatch}" aria-hidden="true"></span><span class="tool-label">${tool.label}</span>`;
+        button.addEventListener("click", () => {
+          currentTool = tool.id;
+          buildTools();
+          draw();
+        });
+        toolGrid.appendChild(button);
+      });
+    }
+
+    function pushUndo() {
+      undoStack.push(clonePark());
+      if (undoStack.length > 40) undoStack.shift();
+      undoButton.disabled = undoStack.length === 0;
+    }
+
+    function getBrushCells(centerColumn, centerRow) {
+      const size = Number(brushInput.value);
+      const radius = size - 1;
+      const cells = [];
+      for (let row = centerRow - radius; row <= centerRow + radius; row += 1) {
+        for (let column = centerColumn - radius; column <= centerColumn + radius; column += 1) {
+          const distance = Math.abs(column - centerColumn) + Math.abs(row - centerRow);
+          if (column >= 0 && column < columns && row >= 0 && row < rows && distance <= radius) {
+            cells.push({ column, row });
+          }
+        }
+      }
+      return cells;
+    }
+
+    function paintAt(column, row) {
+      const key = `${column}:${row}:${currentTool}:${brushInput.value}`;
+      if (key === lastPainted) return;
+      lastPainted = key;
+      const activeTool = tools.find((item) => item.id === currentTool);
+
+      if (activeTool?.id === "vending") {
+        removeVendingMachines();
+        const cell = park[row]?.[column];
+        if (cell) {
+          if (cell.terrain === "water") cell.terrain = "plaza";
+          cell.object = "vending";
+        }
+        savePark();
+        draw();
+        return;
+      }
+
+      getBrushCells(column, row).forEach(({ column: cellColumn, row: cellRow }) => {
+        const cell = park[cellRow][cellColumn];
+
+        if (activeTool.kind === "terrain") {
+          cell.terrain = activeTool.id;
+          if (activeTool.id === "water") cell.object = null;
+        }
+
+        if (activeTool.kind === "object") {
+          if (buildingObjects.includes(activeTool.id)) cell.terrain = "plaza";
+          if (cell.terrain !== "water") cell.object = activeTool.id;
+        }
+
+        if (activeTool.kind === "erase") {
+          cell.terrain = "grass";
+          cell.object = null;
+        }
+      });
+
+      savePark();
+      draw();
+    }
+
+    function removeVendingMachines() {
+      park.forEach((row) => {
+        row.forEach((cell) => {
+          if (cell.object === "vending") cell.object = null;
+        });
+      });
+    }
+
+    function pointerToCell(event) {
+      const rect = canvas.getBoundingClientRect();
+      const x = (event.clientX - rect.left) * (canvas.width / rect.width);
+      const y = (event.clientY - rect.top) * (canvas.height / rect.height);
+      return {
+        column: Math.floor(x / tile),
+        row: Math.floor(y / tile)
+      };
+    }
+
+    function drawPixelRect(x, y, width, height, color) {
+      ctx.fillStyle = color;
+      ctx.fillRect(Math.round(x), Math.round(y), Math.round(width), Math.round(height));
+    }
+
+    function drawTerrain(cell, x, y, column, row) {
+      drawPixelRect(x, y, tile, tile, terrainColors[cell.terrain]);
+
+      if (cell.terrain === "grass") {
+        const fleck = (column * 11 + row * 17) % 5;
+        if (fleck < 3) {
+          ctx.fillStyle = fleck === 0 ? "rgba(54, 123, 67, 0.28)" : "rgba(235, 244, 183, 0.32)";
+          ctx.fillRect(x + 7 + fleck * 4, y + 6 + ((column + row) % 4) * 5, 2, 5);
+          ctx.fillRect(x + 11 + fleck * 3, y + 12 + ((column * 2 + row) % 3) * 4, 2, 4);
+        }
+      }
+
+      if (cell.terrain === "path") {
+        ctx.fillStyle = "rgba(127, 95, 52, 0.18)";
+        ctx.fillRect(x + 4, y + 7, 7, 3);
+        ctx.fillRect(x + 18, y + 16, 8, 3);
+        ctx.fillRect(x + 10, y + 24, 5, 2);
+      }
+
+      if (cell.terrain === "plaza") {
+        ctx.strokeStyle = "rgba(75, 78, 74, 0.22)";
+        ctx.lineWidth = 1;
+        for (let offset = 8; offset < tile; offset += 8) {
+          ctx.beginPath();
+          ctx.moveTo(x + offset + 0.5, y);
+          ctx.lineTo(x + offset + 0.5, y + tile);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(x, y + offset + 0.5);
+          ctx.lineTo(x + tile, y + offset + 0.5);
+          ctx.stroke();
+        }
+        if ((column + row) % 2 === 0) {
+          ctx.fillStyle = "rgba(255, 255, 255, 0.16)";
+          ctx.fillRect(x + 2, y + 2, 12, 2);
+        }
+      }
+
+      if (cell.terrain === "water") {
+        ctx.fillStyle = "rgba(222, 250, 255, 0.5)";
+        ctx.fillRect(x + 5, y + 9, 10, 3);
+        ctx.fillRect(x + 15, y + 20, 12, 3);
+        ctx.fillStyle = "rgba(26, 91, 130, 0.14)";
+        ctx.fillRect(x, y + tile - 5, tile, 5);
+      }
+    }
+
+    function drawObject(type, x, y, column, row) {
+      if (buildingStyles[type]) {
+        drawBuilding(type, x, y);
+        return;
+      }
+
+      if (type === "tree") {
+        drawPixelRect(x + 14, y + 15, 5, 12, "#8a5b38");
+        drawPixelRect(x + 9, y + 9, 14, 12, "#2f8a4d");
+        drawPixelRect(x + 6, y + 13, 20, 9, "#276d42");
+        drawPixelRect(x + 12, y + 5, 11, 8, "#3d9b57");
+        drawPixelRect(x + 22, y + 15, 4, 4, "#245f3b");
+      }
+
+      if (type === "flower") {
+        const palette = ["#e34f71", "#f1844e", "#f0cf45", "#7c5bb2"];
+        for (let i = 0; i < 4; i += 1) {
+          const px = x + 7 + ((i * 7 + column * 3) % 18);
+          const py = y + 8 + ((i * 5 + row * 4) % 16);
+          drawPixelRect(px, py + 5, 2, 7, "#3f8a48");
+          drawPixelRect(px - 2, py + 2, 6, 5, palette[(i + column + row) % palette.length]);
+          drawPixelRect(px, py + 4, 2, 2, "#ffe179");
+        }
+      }
+
+      if (type === "bench") {
+        drawPixelRect(x + 6, y + 10, 20, 5, "#8a5432");
+        drawPixelRect(x + 5, y + 18, 22, 5, "#9b6038");
+        drawPixelRect(x + 8, y + 23, 3, 6, "#3f4945");
+        drawPixelRect(x + 22, y + 23, 3, 6, "#3f4945");
+        drawPixelRect(x + 4, y + 16, 24, 2, "#5f3a25");
+      }
+
+      if (type === "lamp") {
+        drawPixelRect(x + 15, y + 9, 3, 18, "#384543");
+        drawPixelRect(x + 11, y + 5, 11, 8, "#ffd96a");
+        drawPixelRect(x + 12, y + 6, 9, 6, "rgba(255, 246, 170, 0.78)");
+        drawPixelRect(x + 10, y + 27, 13, 3, "#384543");
+      }
+
+      if (type === "rock") {
+        drawPixelRect(x + 8, y + 17, 17, 8, "#737d78");
+        drawPixelRect(x + 11, y + 13, 12, 8, "#8f9892");
+        drawPixelRect(x + 16, y + 15, 7, 5, "#aab0aa");
+        drawPixelRect(x + 7, y + 23, 20, 3, "rgba(42, 52, 48, 0.14)");
+      }
+
+      if (type === "trash") {
+        drawPixelRect(x + 10, y + 9, 13, 3, "#e7d769");
+        drawPixelRect(x + 11, y + 12, 11, 15, "#2f6f6b");
+        drawPixelRect(x + 13, y + 15, 7, 9, "#3b8881");
+        drawPixelRect(x + 9, y + 27, 15, 3, "rgba(42, 52, 48, 0.16)");
+      }
+
+      if (type === "sign") {
+        drawPixelRect(x + 15, y + 12, 3, 17, "#3f4945");
+        drawPixelRect(x + 8, y + 7, 18, 10, "#f3f0df");
+        drawPixelRect(x + 10, y + 9, 10, 2, "#2f7d62");
+        drawPixelRect(x + 10, y + 13, 13, 2, "#61706b");
+        drawPixelRect(x + 11, y + 29, 13, 2, "rgba(42, 52, 48, 0.16)");
+      }
+
+      if (type === "vending") {
+        drawPixelRect(x + 7, y + 3, 18, 27, "#b9352e");
+        drawPixelRect(x + 9, y + 5, 10, 11, "#f4e8c4");
+        drawPixelRect(x + 20, y + 6, 3, 18, "#263744");
+        drawPixelRect(x + 10, y + 8, 3, 5, "#58a7d3");
+        drawPixelRect(x + 14, y + 8, 3, 5, "#7ab45d");
+        drawPixelRect(x + 9, y + 18, 10, 4, "#2b2f32");
+        drawPixelRect(x + 21, y + 10, 1, 2, "#f6e16d");
+        drawPixelRect(x + 5, y + 30, 22, 2, "rgba(42, 52, 48, 0.18)");
+      }
+    }
+
+    function drawBuilding(type, x, y) {
+      const style = buildingStyles[type];
+      drawPixelRect(x + 3, y + 7, 26, 22, style.color);
+      drawPixelRect(x + 2, y + 4, 28, 5, style.roof);
+      drawPixelRect(x + 7, y + 12, 5, 5, "rgba(244, 239, 217, 0.78)");
+      drawPixelRect(x + 14, y + 12, 5, 5, "rgba(244, 239, 217, 0.62)");
+      drawPixelRect(x + 21, y + 12, 4, 5, "rgba(244, 239, 217, 0.7)");
+      drawPixelRect(x + 14, y + 21, 6, 8, "#343d3a");
+      drawPixelRect(x + 2, y + 29, 28, 3, "rgba(42, 52, 48, 0.15)");
+      ctx.fillStyle = "#fffdf0";
+      ctx.font = "bold 12px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(style.label, x + 16, y + 19);
+    }
+
+    function drawGrid() {
+      if (!showGrid) return;
+      ctx.strokeStyle = "rgba(45, 64, 54, 0.16)";
+      ctx.lineWidth = 1;
+      for (let column = 0; column <= columns; column += 1) {
+        ctx.beginPath();
+        ctx.moveTo(column * tile + 0.5, 0);
+        ctx.lineTo(column * tile + 0.5, canvas.height);
+        ctx.stroke();
+      }
+      for (let row = 0; row <= rows; row += 1) {
+        ctx.beginPath();
+        ctx.moveTo(0, row * tile + 0.5);
+        ctx.lineTo(canvas.width, row * tile + 0.5);
+        ctx.stroke();
+      }
+    }
+
+    function drawAgents() {
+      agents.forEach((agent) => {
+        drawPixelRect(agent.x - 5, agent.y - 2, 10, 9, "rgba(33, 49, 44, 0.15)");
+        drawPixelRect(agent.x - 4, agent.y - 8, 8, 10, agent.color);
+        drawPixelRect(agent.x - 3, agent.y - 12, 6, 5, "#f0c49b");
+        drawPixelRect(agent.x - 6, agent.y + 1, 4, 5, "#263744");
+        drawPixelRect(agent.x + 2, agent.y + 1, 4, 5, "#263744");
+        if (agent.type !== "consumer") {
+          drawPixelRect(agent.x + 5, agent.y - 7, 5, 6, "#e7d769");
+        }
+        if (agent.state.startsWith("买了")) {
+          drawPixelRect(agent.x + 5, agent.y - 14, 8, 7, "#fff8c9");
+          drawPixelRect(agent.x + 7, agent.y - 12, 4, 3, "#2f7d62");
+        }
+      });
+    }
+
+    function drawVendingEconomySignal() {
+      const point = vendingPoint();
+      if (!point) return;
+      const pulse = 4 + Math.sin(performance.now() / 220) * 2;
+      ctx.strokeStyle = "rgba(47, 125, 98, 0.42)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, tile * 1.15 + pulse, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    function drawEnvironmentOverlay() {
+      const weather = weatherInfo();
+      const hour = environment.hour;
+      const night = hour < 6 || hour >= 20;
+      ctx.fillStyle = weather.color;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      if (night) {
+        ctx.fillStyle = "rgba(20, 34, 48, 0.22)";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+
+      if (environment.weather === "rain") {
+        ctx.strokeStyle = "rgba(226, 241, 255, 0.45)";
+        ctx.lineWidth = 2;
+        const shift = Math.floor(performance.now() / 80) % 28;
+        for (let x = -20; x < canvas.width; x += 34) {
+          ctx.beginPath();
+          ctx.moveTo(x + shift, 0);
+          ctx.lineTo(x + shift + 16, 28);
+          ctx.stroke();
+        }
+      }
+
+      if (environment.weather === "heat") {
+        ctx.fillStyle = "rgba(255, 245, 160, 0.09)";
+        for (let x = 0; x < canvas.width; x += 96) {
+          ctx.fillRect(x, 0, 34, canvas.height);
+        }
+      }
+    }
+
+    function drawBrushPreview() {
+      const activeTool = tools.find((tool) => tool.id === currentTool);
+      document.body.style.setProperty("--active-tool", activeTool?.label || "");
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      for (let row = 0; row < rows; row += 1) {
+        for (let column = 0; column < columns; column += 1) {
+          drawTerrain(park[row][column], column * tile, row * tile, column, row);
+        }
+      }
+
+      for (let row = 0; row < rows; row += 1) {
+        for (let column = 0; column < columns; column += 1) {
+          const cell = park[row][column];
+          if (cell.object) drawObject(cell.object, column * tile, row * tile, column, row);
+        }
+      }
+
+      drawGrid();
+      drawVendingEconomySignal();
+      drawAgents();
+      drawEnvironmentOverlay();
+      drawBrushPreview();
+      updateSummary();
+      renderEconomyPanel();
+      undoButton.disabled = undoStack.length === 0;
+    }
+
+    function updateSummary() {
+      const counts = {
+        tree: 0,
+        flower: 0,
+        bench: 0,
+        lamp: 0,
+        rock: 0,
+        trash: 0,
+        sign: 0,
+        vending: 0,
+        water: 0,
+        path: 0,
+        plaza: 0
+      };
+      park.flat().forEach((cell) => {
+        if (cell.object && Object.hasOwn(counts, cell.object)) counts[cell.object] += 1;
+        if (cell.terrain === "water") counts.water += 1;
+        if (cell.terrain === "path") counts.path += 1;
+        if (cell.terrain === "plaza") counts.plaza += 1;
+      });
+      summary.textContent = `贩卖机 ${counts.vending} · 收入 ¥${economy.revenue.toFixed(0)} · 成交 ${economy.sales}`;
+    }
+
+    function renderEconomyPanel(force = false) {
+      const now = performance.now();
+      if (!force && now - lastEconomyUiUpdate < 240) return;
+      lastEconomyUiUpdate = now;
+
+      const machineCount = findVendingMachines().length;
+      economyStatus.textContent = machineCount > 0
+        ? economy.lastEvent
+        : "交易暂停：缺少自动贩卖机。";
+      simClockValue.textContent = formatSimTime();
+      environmentGrid.innerHTML = [
+        ["天气", weatherInfo().label],
+        ["季节", seasonInfo().label],
+        ["日历", environment.holiday],
+        ["客流", environment.trafficIndex.toFixed(2)],
+        ["需求", environment.demandIndex.toFixed(2)],
+        ["仿真日", `D${environment.day}`],
+        ["办公", isBusinessOpen("office") ? "营业" : "下班"],
+        ["银行", isBusinessOpen("bank") ? "营业" : "关闭"],
+        ["今日波动", `${Math.round(environment.dailyTrafficVariance * 100)}%`],
+        ["学习段", environment.lastTrafficLearning]
+      ].map(([label, value]) => `
+        <div class="environment-card">
+          <span>${label}</span>
+          <strong>${value}</strong>
+        </div>
+      `).join("");
+      economyToggle.textContent = economyRunning ? "暂停" : "运行";
+      revenueValue.textContent = `¥${economy.revenue.toFixed(2)}`;
+      salesValue.textContent = String(economy.sales);
+      profitValue.textContent = `¥${(economy.revenue - economy.costs).toFixed(2)}`;
+      operatorCashValue.textContent = `¥${economy.operatorCash.toFixed(2)}`;
+      loanValue.textContent = `¥${economy.loans.toFixed(2)}`;
+      healthValue.textContent = economy.health.toFixed(0);
+      trashValue.textContent = economy.trash.toFixed(0);
+      agentCountValue.textContent = String(agents.length);
+      slaModeValue.textContent = vendingAgent.sla.enabled ? "保险生效" : "仅审计";
+
+      stockList.innerHTML = productCatalog.map((product) => {
+        const stock = economy.stock[product.id];
+        const percent = Math.max(0, Math.min(100, (stock / product.maxStock) * 100));
+        const priceLockHours = remainingPriceLockHours(product.id);
+        return `
+          <div class="stock-row">
+            <span>${product.label} ¥${economy.prices[product.id].toFixed(1)}${priceLockHours > 0 ? ` · 锁${Math.ceil(priceLockHours)}h` : ""}</span>
+            <span class="stock-bar"><span class="stock-fill" style="width: ${percent}%; background: ${product.color};"></span></span>
+            <strong>${stock}</strong>
+          </div>
+        `;
+      }).join("");
+
+      agentList.innerHTML = agents.map((agent) => `
+        <div class="agent-row">
+          <span class="agent-name"><span class="agent-dot" style="background: ${agent.color};"></span>${agent.role}</span>
+          <strong>${agent.state}</strong>
+        </div>
+      `).join("");
+
+      aiStateValue.textContent = vendingAgent.state;
+      aiToggleButton.textContent = vendingAgent.enabled ? "AI 自动" : "AI 暂停";
+      aiStrategyButton.textContent = activeStrategy().label;
+      llmModeValue.textContent = vendingAgent.llmMode;
+      const observation = vendingAgent.observations || {};
+      aiObservationGrid.innerHTML = [
+        ["客流", observation.traffic ?? 0],
+        ["库存风险", observation.stockRisk?.length ? labelsFor(observation.stockRisk) : "无"],
+        ["现金", `¥${(observation.cash ?? economy.operatorCash).toFixed(0)}`],
+        ["热卖", labelsFor([observation.bestSeller || "water"])],
+        ["健康", `${(observation.health ?? economy.health).toFixed(0)}`],
+        ["垃圾", Number(observation.trash ?? economy.trash).toFixed(0)],
+        ["天气", observation.weather || weatherInfo().label],
+        ["节假", observation.holiday || environment.holiday],
+        ["学习", observation.learningLabel || environment.lastTrafficLearning],
+        ["调价", observation.pricePolicy || priceLockSummary()],
+        ["月结", `¥${(observation.supplierPayable ?? economy.supplierPayable).toFixed(0)} / D${economy.nextSupplierSettlementDay}`]
+      ].map(([label, value]) => `
+        <div class="ai-card">
+          <span>${label}</span>
+          <strong>${value}</strong>
+        </div>
+      `).join("");
+      aiDecisionList.innerHTML = vendingAgent.decisions.map((decision) => `<li>${decision}</li>`).join("");
+      aiReasoningTrace.innerHTML = vendingAgent.reasoningTrace.map((step) => `
+        <div class="reasoning-step">
+          <strong>${step.label}</strong>
+          <span>${step.text}</span>
+        </div>
+      `).join("");
+      slaGrid.innerHTML = [
+        ["保障池", `¥${vendingAgent.sla.coveragePool.toFixed(0)}`],
+        ["已赔付", `¥${economy.claimsPaid.toFixed(0)}`],
+        ["拦截", vendingAgent.sla.blocked],
+        ["风险上限", vendingAgent.sla.riskLimit],
+        ["贷款上限", `¥${vendingAgent.sla.maxLoan}`],
+        ["订单上限", `¥${vendingAgent.sla.maxOrderCost}`],
+        ["调价治理", priceLockSummary()],
+        ["供货应付", `¥${economy.supplierPayable.toFixed(0)}`]
+      ].map(([label, value]) => `
+        <div class="sla-card">
+          <span>${label}</span>
+          <strong>${value}</strong>
+        </div>
+      `).join("");
+      auditHeightValue.textContent = `#${vendingAgent.auditTrail.length}`;
+      auditTrailList.innerHTML = vendingAgent.auditTrail.slice(0, 8).map((entry) => `
+        <div class="audit-item">
+          <strong>${entry.hash}</strong>
+          <span>${entry.action} · 风险 ${entry.risk} · ${entry.status}</span>
+          <span>${entry.summary}</span>
+        </div>
+      `).join("");
+      dailyReportStatus.textContent = economy.dailyReports[0] ? `D${economy.dailyReports[0].day} 已生成` : "等待午夜";
+      dailyReportList.innerHTML = economy.dailyReports.slice(0, 7).map((report) => `
+        <div class="report-item">
+          <strong>D${report.day} ${report.title}</strong>
+          <span>${report.summary}</span>
+          <span>${report.risk}</span>
+          <span>${report.environmentSummary}</span>
+          ${report.learning ? `<span>${report.learning}</span>` : ""}
+        </div>
+      `).join("");
+      aiMemoryList.innerHTML = vendingAgent.memory.map((item) => `<li>${item}</li>`).join("");
+    }
+
+    function updateEconomy(delta) {
+      if (!economyRunning) return;
+
+      updateEnvironment(delta);
+
+      const machine = vendingPoint();
+      economy.restockCooldown = Math.max(0, economy.restockCooldown - delta);
+      if (!machine) {
+        economy.lastEvent = "经济系统缺少自动贩卖机。";
+        agents.forEach((agent) => wanderAgent(agent, delta));
+        return;
+      }
+
+      updateClosedLoop(delta, machine);
+      updateVendingAgent(delta, machine);
+
+      agents.forEach((agent) => {
+        if (agent.type === "consumer") {
+          updateBuyerAgent(agent, delta, machine);
+        } else {
+          updateSystemAgent(agent, delta, machine);
+        }
+      });
+    }
+
+    function updateEnvironment(delta) {
+      const previousDay = environment.day;
+      environment.elapsedHours += delta * environment.timeScale;
+      const dayIndex = Math.floor(environment.elapsedHours / 24);
+      const hourFloat = environment.elapsedHours % 24;
+      environment.day = dayIndex + 1;
+      environment.hour = Math.floor(hourFloat);
+      environment.minute = Math.floor((hourFloat - environment.hour) * 60);
+      environment.weekday = (dayIndex + 1) % 7;
+      environment.season = seasonTypes[Math.floor((environment.day - 1) / 7) % seasonTypes.length].id;
+      environment.holiday = holidayName(environment.day, environment.weekday);
+      environment.weatherTimer -= delta;
+
+      if (environment.weatherTimer <= 0) {
+        environment.weather = chooseWeather();
+        environment.lastWeatherChange = weatherInfo().label;
+        environment.weatherTimer = 18 + Math.random() * 18;
+      }
+
+      let profile = environmentProfile();
+      if (environment.day !== previousDay) {
+        const closedContext = closedDayEnvironmentSummary(previousDay);
+        updateSupplierSettlementSchedule(previousDay);
+        generateDailyReport(previousDay, closedContext);
+        resetDailyPriceGovernance();
+        resetDailyEnvironmentStats();
+        rollDailyTrafficProfile();
+        environment.previousDay = environment.day;
+        profile = environmentProfile();
+      }
+
+      environment.trafficIndex = profile.trafficIndex;
+      environment.demandIndex = profile.demandIndex;
+      recordDailyEnvironmentSample(profile, delta);
+    }
+
+    function environmentProfile() {
+      const weather = weatherInfo();
+      const season = seasonInfo();
+      const hour = environment.hour;
+      const commutePeak = (hour >= 7 && hour <= 9) || (hour >= 17 && hour <= 18);
+      const lunchPeak = hour >= 11 && hour <= 13;
+      const afterWorkLeisure = hour >= 18 && hour <= 21;
+      const nightLow = hour < 6 || hour >= 22;
+      const weekend = environment.weekday === 0 || environment.weekday === 6;
+      const holidayBoost = environment.holiday !== "工作日" ? 1.45 : 1;
+      const weekendTraffic = lunchPeak ? 1.28 : afterWorkLeisure ? 1.24 : 1.15;
+      const timeTraffic = nightLow ? 0.22 : weekend ? weekendTraffic : commutePeak ? 1.34 : lunchPeak ? 1.2 : afterWorkLeisure ? 1.18 : 0.86;
+      const microTraffic = 1
+        + Math.sin(environment.elapsedHours * 2.6 + environment.trafficWave) * 0.08
+        + Math.sin(environment.elapsedHours * 5.1 + environment.trafficWave * 0.7) * 0.04;
+      const trafficIndex = clamp(timeTraffic * weather.traffic * season.traffic * holidayBoost * environment.dailyTrafficVariance * microTraffic, 0.12, 2.4);
+      const demandIndex = clamp((lunchPeak ? 1.18 : 1) * weather.demand * holidayBoost, 0.2, 2.2);
+      return { trafficIndex, demandIndex };
+    }
+
+    function rollDailyTrafficProfile() {
+      environment.dailyTrafficVariance = Number(clamp(0.74 + Math.random() * 0.58, 0.72, 1.34).toFixed(2));
+      environment.trafficWave = Math.random() * Math.PI * 2;
+      environment.lastTrafficLearning = `D${environment.day} 波动${Math.round(environment.dailyTrafficVariance * 100)}%`;
+    }
+
+    function recordDailyEnvironmentSample(profile, delta) {
+      const weight = Math.max(0.001, delta * environment.timeScale);
+      environment.dailyTrafficSamples += weight;
+      environment.dailyTrafficTotal += profile.trafficIndex * weight;
+      environment.dailyDemandTotal += profile.demandIndex * weight;
+      environment.dailyPeakTraffic = Math.max(environment.dailyPeakTraffic, profile.trafficIndex);
+    }
+
+    function resetDailyEnvironmentStats() {
+      environment.dailyTrafficSamples = 0;
+      environment.dailyTrafficTotal = 0;
+      environment.dailyDemandTotal = 0;
+      environment.dailyPeakTraffic = 0;
+    }
+
+    function closedDayEnvironmentSummary(day) {
+      const samples = Math.max(0.001, environment.dailyTrafficSamples);
+      const weekday = day % 7;
+      return {
+        weather: weatherInfo().label,
+        season: seasonInfo().label,
+        holiday: holidayName(day, weekday),
+        avgTraffic: environment.dailyTrafficTotal / samples,
+        avgDemand: environment.dailyDemandTotal / samples,
+        peakTraffic: environment.dailyPeakTraffic || environment.trafficIndex,
+        variance: environment.dailyTrafficVariance
+      };
+    }
+
+    function isBusinessOpen(kind) {
+      const schedule = socialSchedules[kind];
+      if (!schedule) return true;
+      if ((kind === "office" || kind === "bank" || kind === "school") && (environment.weekday === 0 || environment.weekday === 6)) {
+        return false;
+      }
+      const hour = environment.hour + environment.minute / 60;
+      return hour >= schedule.open && hour < schedule.close;
+    }
+
+    function serviceAvailability(kind) {
+      if (kind === "banker") return isBusinessOpen("bank") ? 1 : 0.08;
+      if (kind === "supplier") return isBusinessOpen("supplier") ? 1 : 0.12;
+      if (kind === "logistics") return isBusinessOpen("logistics") ? 1 : 0.35;
+      if (kind === "employer") return isBusinessOpen("office") ? 1 : 0.12;
+      return 1;
+    }
+
+    function trafficSegment() {
+      const hour = environment.hour + environment.minute / 60;
+      const weekend = environment.weekday === 0 || environment.weekday === 6 || environment.holiday !== "工作日";
+      if (weekend) return "weekend";
+      if (hour < 6 || hour >= 22) return "night";
+      if ((hour >= 7 && hour <= 9) || (hour >= 17 && hour <= 18.5)) return "commute";
+      if (hour >= 11 && hour <= 13.5) return "lunch";
+      if (hour >= 18.5 && hour <= 21) return "afterWork";
+      if (isBusinessOpen("office")) return "workday";
+      return "leisure";
+    }
+
+    function trafficSegmentLabel(segment = trafficSegment()) {
+      const labels = {
+        commute: "通勤",
+        workday: "上班",
+        lunch: "午间",
+        afterWork: "下班后",
+        leisure: "休闲",
+        night: "夜间",
+        weekend: "节假"
+      };
+      return labels[segment] || "客流";
+    }
+
+    function snapshotEconomy(state = economy, auditCount = vendingAgent.auditTrail.length, slaBlocked = vendingAgent.sla.blocked) {
+      return {
+        revenue: state.revenue,
+        costs: state.costs,
+        sales: state.sales,
+        missedSales: state.missedSales,
+        loans: state.loans,
+        claimsPaid: state.claimsPaid,
+        trash: state.trash,
+        health: state.health,
+        auditCount,
+        slaBlocked,
+        wagesPaid: state.wagesPaid,
+        supplierPayable: state.supplierPayable
+      };
+    }
+
+    function generateDailyReport(day, closedContext = closedDayEnvironmentSummary(day)) {
+      const start = economy.dayStart || snapshotEconomy(economy, vendingAgent.auditTrail.length, vendingAgent.sla.blocked);
+      const sales = economy.sales - start.sales;
+      const revenue = economy.revenue - start.revenue;
+      const costs = economy.costs - start.costs;
+      const profit = revenue - costs;
+      const missed = economy.missedSales - start.missedSales;
+      const blocked = vendingAgent.sla.blocked - start.slaBlocked;
+      const audits = vendingAgent.auditTrail.length - start.auditCount;
+      const claims = economy.claimsPaid - start.claimsPaid;
+      const payableDelta = economy.supplierPayable - start.supplierPayable;
+      const learning = evolveVendingAgentFromDay({ day, sales, profit, missed, avgTraffic: closedContext.avgTraffic });
+      const title = `${formatReportWeekday(day)} 日报`;
+      const summary = `销售 ${sales} 单，收入 ¥${revenue.toFixed(2)}，成本 ¥${costs.toFixed(2)}，利润 ¥${profit.toFixed(2)}，流失 ${missed}。`;
+      const risk = `SLA 拦截 ${blocked} 次，赔付 ¥${claims.toFixed(2)}，审计 ${audits} 条；贷款 ¥${economy.loans.toFixed(2)}，供货应付 ¥${economy.supplierPayable.toFixed(2)}。`;
+      const environmentSummary = `全天环境：${closedContext.weather}/${closedContext.season}，${closedContext.holiday}，均值 ${closedContext.avgTraffic.toFixed(2)}，峰值 ${closedContext.peakTraffic.toFixed(2)}，日扰动 ${Math.round(closedContext.variance * 100)}%。`;
+      const payableSummary = payableDelta === 0 ? "" : `供货账款变化 ¥${payableDelta.toFixed(2)}，下次月结 D${economy.nextSupplierSettlementDay}。`;
+      economy.dailyReports.unshift({ day, title, summary, risk, environmentSummary, learning: `${learning}${payableSummary ? `；${payableSummary}` : ""}` });
+      economy.dailyReports = economy.dailyReports.slice(0, 12);
+      economy.dayStart = snapshotEconomy(economy, vendingAgent.auditTrail.length, vendingAgent.sla.blocked);
+      vendingAgent.reasoningTrace = [
+        { label: "日报输入", text: `${formatReportWeekday(day)} 00:00 自动结算，读取全天销售、风险和环境数据。` },
+        { label: "经营摘要", text: summary },
+        { label: "风险摘要", text: risk },
+        { label: "外部环境", text: environmentSummary },
+        { label: "学习更新", text: learning }
+      ];
+      rememberAI(`D${day} 日报生成：销售 ${sales} 单，利润 ¥${profit.toFixed(2)}。`);
+      recordAudit("DAILY_REPORT", { day, sales, revenue, profit, blocked, claims }, 14, "committed", `D${day} 日报已生成。`);
+    }
+
+    function formatReportWeekday(day) {
+      const weekdays = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+      return weekdays[day % 7];
+    }
+
+    function evolveVendingAgentFromDay({ day, sales, profit, missed, avgTraffic }) {
+      const learning = vendingAgent.learning;
+      const previousBias = learning.restockBias;
+      const lossPressure = missed > Math.max(2, sales * 0.25);
+      if (lossPressure) learning.restockBias = clamp(learning.restockBias + 0.05, 0.88, 1.28);
+      if (profit < -12 && !lossPressure) learning.restockBias = clamp(learning.restockBias - 0.04, 0.88, 1.28);
+      if (avgTraffic > 1.18 && profit >= 0) learning.confidence = clamp(learning.confidence + 0.04, 0.25, 0.92);
+      if (sales === 0 && missed === 0) learning.confidence = clamp(learning.confidence - 0.02, 0.2, 0.92);
+      if (Math.abs(previousBias - learning.restockBias) >= 0.01) learning.version += 1;
+      learning.lastInsight = `v${learning.version} 安全库存${Math.round(learning.restockBias * 100)}%，置信${Math.round(learning.confidence * 100)}%。`;
+      if (day % 3 === 0 || Math.abs(previousBias - learning.restockBias) >= 0.01) rememberAI(`学习更新：${learning.lastInsight}`);
+      return `学习进化：${learning.lastInsight}`;
+    }
+
+    function resetDailyPriceGovernance() {
+      Object.keys(economy.priceChangesToday).forEach((id) => {
+        economy.priceChangesToday[id] = 0;
+      });
+      economy.priceGovernance.lastAction = "新营业日开始，调价次数已清零。";
+    }
+
+    function updateSupplierSettlementSchedule(closedDay) {
+      while (closedDay >= economy.nextSupplierSettlementDay) {
+        const settlementDay = economy.nextSupplierSettlementDay;
+        economy.nextSupplierSettlementDay += 28;
+        if (economy.supplierPayable <= 0 || economy.supplierSettlementDue) continue;
+        economy.supplierSettlementDue = true;
+        economy.lastEvent = `D${settlementDay} 月结到期，供货商应收 ¥${economy.supplierPayable.toFixed(2)} 等待银行营业清算。`;
+        recordAudit("SUPPLIER_MONTH_END", {
+          settlementDay,
+          payable: economy.supplierPayable
+        }, 18, "pending", "供应商月底结算进入待清算状态。");
+        rememberAI(`供应商月结到期：应付 ¥${economy.supplierPayable.toFixed(2)}。`);
+      }
+    }
+
+    function holidayName(day, weekday) {
+      if (day % 28 === 6 || day % 28 === 7) return "城市节";
+      if (weekday === 0 || weekday === 6) return "周末";
+      return "工作日";
+    }
+
+    function chooseWeather() {
+      const season = seasonInfo().id;
+      const roll = Math.random();
+      if (season === "summer") {
+        if (roll < 0.34) return "heat";
+        if (roll < 0.58) return "rain";
+      }
+      if (season === "winter") {
+        if (roll < 0.38) return "cold";
+        if (roll < 0.55) return "cloudy";
+      }
+      if (roll < 0.2) return "rain";
+      if (roll < 0.48) return "cloudy";
+      return "sunny";
+    }
+
+    function weatherInfo() {
+      return weatherTypes.find((item) => item.id === environment.weather) || weatherTypes[0];
+    }
+
+    function seasonInfo() {
+      return seasonTypes.find((item) => item.id === environment.season) || seasonTypes[0];
+    }
+
+    function formatSimTime() {
+      const weekdays = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+      return `${weekdays[environment.weekday]} ${String(environment.hour).padStart(2, "0")}:${String(environment.minute).padStart(2, "0")}`;
+    }
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function updateBuyerAgent(agent, delta, machine) {
+      if (agent.wait > 0) {
+        agent.wait -= delta;
+        if (agent.wait <= 0 && agent.state !== "前往贩卖机") agent.state = "闲逛";
+        return;
+      }
+
+      agent.cooldown -= delta;
+      const roleTraffic = consumerTrafficFactor(agent);
+      const demandChance = agent.demand * environment.demandIndex * roleTraffic;
+      if (agent.cooldown <= 0 && agent.state === "闲逛" && Math.random() < demandChance * delta * 0.48) {
+        agent.target = offsetPoint(machine, 12);
+        agent.state = "前往贩卖机";
+      }
+
+      if (!agent.target) agent.target = randomParkPoint();
+      const arrived = moveAgent(agent, delta);
+      if (!arrived) return;
+
+      if (agent.state === "前往贩卖机") {
+        attemptPurchase(agent);
+        agent.wait = 1.1;
+        agent.cooldown = 2.8 + Math.random() * 4.5;
+        agent.target = randomParkPoint();
+        return;
+      }
+
+      if (agent.budget < 3 && Math.random() < 0.45) {
+        agent.budget += 8 + Math.floor(Math.random() * 7);
+        agent.state = "预算刷新";
+        agent.wait = 0.8;
+      }
+      agent.target = randomParkPoint();
+    }
+
+    function consumerTrafficFactor(agent) {
+      let factor = environment.trafficIndex;
+      if (agent.role === "上班族") {
+        const workday = environment.weekday >= 1 && environment.weekday <= 5 && environment.holiday === "工作日";
+        const commute = workday && ((environment.hour >= 7 && environment.hour <= 9) || (environment.hour >= 17 && environment.hour <= 18));
+        const workHours = isBusinessOpen("office");
+        factor *= commute ? 1.45 : workHours ? 0.58 : 0.95;
+      }
+      if (agent.role === "学生") {
+        const afterSchool = environment.weekday >= 1 && environment.weekday <= 5 && environment.hour >= 15 && environment.hour <= 19;
+        factor *= afterSchool ? 1.42 : isBusinessOpen("school") ? 0.55 : 0.95;
+      }
+      if (agent.role === "游客") {
+        factor *= environment.holiday === "工作日" ? 0.72 : 1.65;
+      }
+      if (agent.role === "跑步者") {
+        const runTime = (environment.hour >= 6 && environment.hour <= 8) || (environment.hour >= 18 && environment.hour <= 20);
+        factor *= runTime ? 1.55 : 0.72;
+        if (environment.weather === "rain" || environment.weather === "cold") factor *= 0.42;
+      }
+      return clamp(factor, 0.05, 2.8);
+    }
+
+    function updateClosedLoop(delta, machine) {
+      economy.health = Math.max(0, economy.health - delta * 0.09);
+      economy.repairCooldown = Math.max(0, economy.repairCooldown - delta);
+      economy.supplierSettlementNoticeTimer = Math.max(0, economy.supplierSettlementNoticeTimer - delta);
+      economy.payrollNoticeTimer = Math.max(0, economy.payrollNoticeTimer - delta);
+      economy.rentTimer -= delta;
+      economy.wageTimer -= delta;
+      economy.settlementTimer -= delta;
+      vendingAgent.sla.premiumTimer -= delta;
+
+      if (vendingAgent.sla.premiumTimer <= 0) {
+        const premium = 2.5;
+        ensureOperatorCash(premium);
+        economy.operatorCash -= premium;
+        economy.costs += premium;
+        vendingAgent.sla.premiumPaid += premium;
+        vendingAgent.sla.coveragePool += premium * 0.7;
+        vendingAgent.sla.premiumTimer = 24;
+        recordAudit("SLA_PREMIUM", { premium }, 12, "committed", "雇主风险保障保费已入池。");
+      }
+
+      if (economy.rentTimer <= 0) {
+        const rent = 6;
+        ensureOperatorCash(rent);
+        economy.operatorCash -= rent;
+        economy.parkCash += rent;
+        economy.costs += rent;
+        economy.rentTimer = 22;
+        economy.lastEvent = `公园管理方收取 ¥${rent.toFixed(2)} 场地和电力费用。`;
+      }
+
+      if (economy.wageTimer <= 0) {
+        if (payrollWindowOpen() && economy.payrollIssuedDay !== environment.day) {
+          let totalWages = 0;
+          agents.forEach((agent) => {
+            if (agent.type === "consumer") {
+              const wage = agent.role === "学生" ? 5 : 9;
+              agent.budget += wage;
+              totalWages += wage;
+            }
+          });
+          economy.wagesPaid += totalWages;
+          economy.payrollIssuedDay = environment.day;
+          economy.wageTimer = 18;
+          economy.lastEvent = `雇主在下班前发放 ¥${totalWages.toFixed(2)} 可支配收入。`;
+        } else {
+          economy.wageTimer = 2;
+          if (!payrollWindowOpen() && economy.payrollNoticeTimer <= 0) {
+            economy.lastEvent = "当前不在办公发薪窗口，工资发放延后。";
+            economy.payrollNoticeTimer = 8;
+          }
+        }
+      }
+
+      if (economy.settlementTimer <= 0) {
+        const fee = Math.min(1.2, Math.max(0.2, economy.sales * 0.01));
+        if (isBusinessOpen("bank")) {
+          ensureOperatorCash(fee);
+          economy.operatorCash -= fee;
+          economy.bankCash += fee;
+          economy.costs += fee;
+          economy.settlementTimer = 16;
+          economy.lastEvent = `银行完成支付清算，收取 ¥${fee.toFixed(2)} 服务费。`;
+        } else {
+          economy.settlementTimer = 1.5;
+          economy.lastEvent = "银行系统已闭市，支付清算延后。";
+        }
+      }
+
+      processSupplierSettlement();
+
+      if (economy.health < 18) {
+        economy.lastEvent = "贩卖机故障风险很高，交易效率下降。";
+      }
+
+      if (environment.weather === "rain" && economy.trash > 0) {
+        economy.trash = Math.max(0, economy.trash - delta * 0.05);
+      }
+    }
+
+    function payrollWindowOpen() {
+      return environment.weekday >= 1
+        && environment.weekday <= 5
+        && environment.hour >= 16
+        && environment.hour < 17
+        && isBusinessOpen("office");
+    }
+
+    function processSupplierSettlement() {
+      if (!economy.supplierSettlementDue || economy.supplierPayable <= 0) return;
+      if (!isBusinessOpen("bank") || !isBusinessOpen("supplier")) {
+        if (economy.supplierSettlementNoticeTimer <= 0) {
+          economy.lastEvent = "供应商月结待清算，银行或供货商尚未进入营业窗口。";
+          economy.supplierSettlementNoticeTimer = 5;
+        }
+        return;
+      }
+
+      const amount = economy.supplierPayable;
+      ensureOperatorCash(amount);
+      economy.operatorCash -= amount;
+      economy.supplierCash += amount;
+      economy.supplierPayable = 0;
+      economy.supplierSettlementDue = false;
+      economy.supplierSettlements.unshift({ day: environment.day, amount });
+      economy.supplierSettlements = economy.supplierSettlements.slice(0, 6);
+      economy.lastEvent = `供应商月结完成，支付货款 ¥${amount.toFixed(2)}。`;
+      recordAudit("SUPPLIER_MONTHLY_SETTLEMENT", { amount, day: environment.day }, 16, "settled", "供应商月结通过银行清算完成。");
+      rememberAI(`供应商月结已清算 ¥${amount.toFixed(2)}。`);
+    }
+
+    function updateVendingAgent(delta, machine) {
+      if (!vendingAgent.enabled) {
+        vendingAgent.state = "人工监控";
+        return;
+      }
+
+      vendingAgent.observationTimer -= delta;
+      vendingAgent.decisionTimer -= delta;
+      vendingAgent.priceTimer -= delta;
+
+      if (vendingAgent.observationTimer <= 0) {
+        vendingAgent.observations = observeEnvironment(machine);
+        vendingAgent.observationTimer = 0.8;
+        vendingAgent.state = "观测中";
+      }
+
+      if (vendingAgent.decisionTimer <= 0) {
+        analyzeAndDecide();
+        vendingAgent.decisionTimer = 2.2;
+      }
+
+      if (vendingAgent.priceTimer <= 0) {
+        tunePrices();
+        vendingAgent.priceTimer = 7;
+      }
+    }
+
+    function observeEnvironment(machine) {
+      const strategy = activeStrategy();
+      const adaptiveLowStock = clamp(strategy.lowStock * vendingAgent.learning.restockBias, 0.22, 0.66);
+      const stockRisk = productCatalog
+        .filter((product) => economy.stock[product.id] / product.maxStock <= adaptiveLowStock)
+        .map((product) => product.id);
+      const traffic = agents.filter((agent) => {
+        return agent.type === "consumer" && Math.hypot(agent.x - machine.x, agent.y - machine.y) < tile * 6;
+      }).length;
+      const learning = updateBotTrafficLearning(traffic);
+      const bestSeller = productCatalog.reduce((best, product) => {
+        return economy.recentSold[product.id] > economy.recentSold[best.id] ? product : best;
+      }, productCatalog[0]);
+
+      return {
+        stockRisk,
+        traffic,
+        bestSeller: bestSeller.id,
+        cash: economy.operatorCash,
+        loan: economy.loans,
+        health: economy.health,
+        trash: economy.trash,
+        profit: economy.revenue - economy.costs,
+        weather: weatherInfo().label,
+        season: seasonInfo().label,
+        holiday: environment.holiday,
+        time: formatSimTime(),
+        trafficIndex: environment.trafficIndex,
+        demandIndex: environment.demandIndex,
+        learnedTraffic: learning.value,
+        learningLabel: learning.label,
+        adaptiveLowStock,
+        pricePolicy: priceLockSummary(),
+        supplierPayable: economy.supplierPayable
+      };
+    }
+
+    function updateBotTrafficLearning(localTraffic) {
+      const segment = trafficSegment();
+      const learning = vendingAgent.learning;
+      const normalizedTraffic = clamp(localTraffic / 2.6, 0.2, 2.1);
+      const previous = learning.trafficSegments[segment] ?? 1;
+      const next = previous * 0.88 + normalizedTraffic * 0.12;
+      learning.trafficSegments[segment] = next;
+      learning.samples += 1;
+      learning.confidence = clamp(0.22 + learning.samples / 180, 0.22, 0.92);
+      const label = `${trafficSegmentLabel(segment)}${Math.round(next * 100)}%`;
+      environment.lastTrafficLearning = label;
+      if (learning.samples % 18 === 0) {
+        learning.lastInsight = `v${learning.version} ${label}，安全库存${Math.round(learning.restockBias * 100)}%。`;
+      }
+      return { value: next, label };
+    }
+
+    function analyzeAndDecide() {
+      const observation = vendingAgent.observations;
+      const decisions = [];
+
+      if (!observation) return;
+
+      if (vendingAgent.actions.restockOrder) {
+        decisions.push(`补货单：${vendingAgent.actions.restockOrder.status}`);
+      }
+      if (vendingAgent.actions.repairRequested) decisions.push("等待维修员响应");
+      if (vendingAgent.actions.cleanRequested) decisions.push("等待清洁员响应");
+
+      if (observation.cash < 30 || (observation.stockRisk.length > 0 && observation.cash < 55)) {
+        if (requestOperatingLoan("AI 预判现金不足，申请周转资金", 90)) decisions.push("申请周转贷款");
+      }
+
+      if (observation.stockRisk.length > 0 && !vendingAgent.actions.restockOrder && economy.restockCooldown <= 0) {
+        const orderItems = Object.fromEntries(observation.stockRisk.map((id) => {
+          const product = productCatalog.find((item) => item.id === id);
+          return [id, Math.max(4, product.maxStock - economy.stock[id])];
+        }));
+        if (openRestockOrder(orderItems, observation)) {
+          decisions.push(`下补货单：${labelsFor(observation.stockRisk)}`);
+          rememberAI(`库存风险 ${labelsFor(observation.stockRisk)}，AI 已下补货单。`);
+        } else {
+          decisions.push("补货单被 SLA 拦截");
+        }
+      }
+
+      if (observation.health < 52 && !vendingAgent.actions.repairRequested && economy.repairCooldown <= 0) {
+        if (requestServiceAction("REPAIR_CALL", "repairRequested", 8, observation, "机器健康下降，AI 呼叫维修员。")) {
+          decisions.push("呼叫维修员");
+        }
+      }
+
+      if (observation.trash >= 8 && !vendingAgent.actions.cleanRequested) {
+        if (requestServiceAction("CLEAN_CALL", "cleanRequested", 4, observation, "垃圾量升高，AI 呼叫清洁员。")) {
+          decisions.push("呼叫清洁员");
+        }
+      }
+
+      if (observation.profit < -18 && vendingAgent.strategy !== "profit") {
+        vendingAgent.strategy = "profit";
+        decisions.push("切换保利润策略");
+        rememberAI("利润转负，AI 切换到保利润策略。");
+      }
+
+      if (decisions.length === 0) decisions.push(`维持${activeStrategy().label}策略`);
+      vendingAgent.decisions = decisions.slice(0, 4);
+      vendingAgent.reasoningTrace = buildReasoningTrace(observation, decisions);
+      vendingAgent.state = decisions[0].startsWith("维持") ? "分析中" : "已决策";
+    }
+
+    function buildReasoningTrace(observation, decisions) {
+      const strategy = activeStrategy();
+      const stockSignal = observation.stockRisk.length ? labelsFor(observation.stockRisk) : "无";
+      const serviceRisk = [
+        observation.health < 52 ? "机器健康偏低" : "",
+        observation.trash >= 8 ? "垃圾量偏高" : "",
+        observation.cash < 30 ? "现金偏低" : ""
+      ].filter(Boolean).join("，") || "服务风险可控";
+
+      return [
+        {
+          label: "输入信号",
+          text: `${observation.time}，${observation.weather}/${observation.season}，${observation.holiday}，客流 ${observation.traffic}，学习段 ${observation.learningLabel}，库存风险 ${stockSignal}，热卖 ${labelsFor([observation.bestSeller])}，现金 ¥${observation.cash.toFixed(0)}。`
+        },
+        {
+          label: "经营约束",
+          text: `策略 ${strategy.label}，补货阈值 ${(observation.adaptiveLowStock * 100).toFixed(0)}%，${observation.pricePolicy}，供货月结 D${economy.nextSupplierSettlementDay}，应付 ¥${economy.supplierPayable.toFixed(0)}，银行 ${isBusinessOpen("bank") ? "营业" : "闭市"}，${serviceRisk}。`
+        },
+        {
+          label: "判断摘要",
+          text: summarizeReasoningJudgment(observation)
+        },
+        {
+          label: "输出动作",
+          text: decisions.join(" / ")
+        }
+      ];
+    }
+
+    function summarizeReasoningJudgment(observation) {
+      if (observation.stockRisk.length > 0) {
+        return `预计 ${labelsFor(observation.stockRisk)} 有缺货风险，优先保障可售库存。`;
+      }
+      if (observation.learnedTraffic > 1.28 && observation.adaptiveLowStock > activeStrategy().lowStock) {
+        return "学习到当前时段客流高于基线，提前提高安全库存阈值。";
+      }
+      if (observation.weather === "高温") {
+        return "高温天气会推高饮水需求，继续监控水库存和价格弹性。";
+      }
+      if (observation.holiday !== "工作日" && observation.trafficIndex > 1.2) {
+        return "节假日客流走高，优先保障游客购买体验。";
+      }
+      if (observation.health < 52) {
+        return "机器健康低于服务阈值，优先降低故障导致的交易流失。";
+      }
+      if (observation.trash >= 8) {
+        return "环境质量开始影响购买意愿，优先恢复现场体验。";
+      }
+      if (observation.profit < -18) {
+        return "经营利润承压，优先控制成本并上调利润策略。";
+      }
+      if (observation.traffic >= 3) {
+        return "附近客流活跃，维持可售状态并监控热卖商品价格。";
+      }
+      return "当前经营状态稳定，继续观测销售、库存和服务质量。";
+    }
+
+    function openRestockOrder(orderItems, observation) {
+      const orderCost = estimateOrderCost(orderItems);
+      const assessment = assessDecisionRisk("RESTOCK_ORDER", { orderItems, orderCost }, observation);
+      if (!assessment.allowed) {
+        blockDecision("RESTOCK_ORDER", assessment, `补货预算 ¥${orderCost.toFixed(2)} 超过 SLA 风险约束。`);
+        return false;
+      }
+      vendingAgent.actions.restockOrder = {
+        items: orderItems,
+        status: "待物流取货",
+        estimatedCost: orderCost
+      };
+      recordAudit("RESTOCK_ORDER", { orderItems, orderCost }, assessment.risk, "committed", `补货单通过 SLA：¥${orderCost.toFixed(2)}。`);
+      return true;
+    }
+
+    function requestServiceAction(action, flag, cost, observation, message) {
+      const assessment = assessDecisionRisk(action, { cost }, observation);
+      if (!assessment.allowed) {
+        blockDecision(action, assessment, `${message} 但 SLA 判定风险过高。`);
+        return false;
+      }
+      vendingAgent.actions[flag] = true;
+      recordAudit(action, { cost }, assessment.risk, "committed", message);
+      rememberAI(message);
+      return true;
+    }
+
+    function tunePrices() {
+      const strategy = activeStrategy();
+      const adjustments = [];
+      const locked = [];
+      productCatalog.forEach((product) => {
+        const previousPrice = economy.prices[product.id];
+        const lockHours = remainingPriceLockHours(product.id);
+        if (lockHours > 0) {
+          locked.push(`${product.label}${Math.ceil(lockHours)}h`);
+          economy.recentSold[product.id] = Math.max(0, Math.floor(economy.recentSold[product.id] * 0.35));
+          return;
+        }
+        if (economy.priceChangesToday[product.id] >= economy.priceGovernance.maxDailyChanges) {
+          locked.push(`${product.label}今日已锁`);
+          economy.recentSold[product.id] = Math.max(0, Math.floor(economy.recentSold[product.id] * 0.35));
+          return;
+        }
+        const sold = economy.recentSold[product.id];
+        const stockRatio = economy.stock[product.id] / product.maxStock;
+        let target = product.price * strategy.priceBias;
+        if (product.id === "water" && (environment.weather === "heat" || environment.season === "summer")) target += 0.3;
+        if (product.id === "tea" && (environment.weather === "cold" || environment.season === "winter")) target += 0.25;
+        if (environment.holiday !== "工作日" && product.id === "snack") target += 0.2;
+        if (sold >= 4 && stockRatio < 0.55) target += 0.5;
+        if (sold === 0 && stockRatio > 0.75 && strategy.id !== "stock") target -= 0.35;
+        const governedTarget = clamp(
+          target,
+          previousPrice * (1 - economy.priceGovernance.maxSingleChangeRate),
+          previousPrice * (1 + economy.priceGovernance.maxSingleChangeRate)
+        );
+        const nextPrice = Math.max(product.cost + 0.8, Math.min(product.price * 1.45, governedTarget));
+        if (Math.abs(nextPrice - economy.prices[product.id]) >= 0.25) {
+          const nextRounded = Number(nextPrice.toFixed(2));
+          const assessment = assessDecisionRisk("PRICE_CHANGE", {
+            product: product.id,
+            previousPrice,
+            nextPrice: nextRounded
+          }, vendingAgent.observations);
+          if (assessment.allowed) {
+            economy.prices[product.id] = nextRounded;
+            economy.priceLastChangedAt[product.id] = environment.elapsedHours;
+            economy.priceChangesToday[product.id] += 1;
+            adjustments.push(`${product.label} ¥${economy.prices[product.id].toFixed(2)}`);
+            recordAudit("PRICE_CHANGE", { product: product.id, previousPrice, nextPrice: nextRounded }, assessment.risk, "committed", `${product.label}售价调整。`);
+            rememberAI(`${product.label}售价调整为 ¥${economy.prices[product.id].toFixed(2)}。`);
+          } else {
+            blockDecision("PRICE_CHANGE", assessment, `${product.label}调价被 SLA 拦截。`);
+          }
+        }
+        economy.recentSold[product.id] = Math.max(0, Math.floor(sold * 0.35));
+      });
+      if (adjustments.length > 0) {
+        economy.priceGovernance.lastAction = `更新：${adjustments.join("，")}。`;
+        vendingAgent.reasoningTrace = [
+          { label: "价格输入", text: `策略 ${strategy.label}，近期销售和库存余量触发价格检查。` },
+          { label: "调价约束", text: `同一商品至少间隔 ${economy.priceGovernance.minIntervalHours} 个模拟小时，每日最多 ${economy.priceGovernance.maxDailyChanges} 次，单次不超过 ${Math.round(economy.priceGovernance.maxSingleChangeRate * 100)}%。` },
+          { label: "输出动作", text: `更新价格：${adjustments.join("，")}。` }
+        ];
+      } else if (locked.length > 0) {
+        economy.priceGovernance.lastAction = `价格冻结：${locked.slice(0, 3).join("，")}。`;
+      }
+    }
+
+    function requestOperatingLoan(reason, targetCash) {
+      if (economy.operatorCash >= targetCash || economy.loans > 180) return false;
+      if (!isBusinessOpen("bank")) {
+        recordAudit("LOAN_REQUEST", { targetCash, bankOpen: false }, 40, "pending", "银行系统闭市，贷款申请延后。");
+        rememberAI("银行系统已闭市，周转贷款延后到下一营业窗口。");
+        return false;
+      }
+      const loan = Math.ceil((targetCash - economy.operatorCash) / 10) * 10;
+      const assessment = assessDecisionRisk("LOAN_REQUEST", { loan, targetCash }, vendingAgent.observations);
+      if (!assessment.allowed) {
+        blockDecision("LOAN_REQUEST", assessment, `贷款 ¥${loan.toFixed(2)} 被 SLA 拦截。`);
+        return false;
+      }
+      economy.operatorCash += loan;
+      economy.bankCash -= loan;
+      economy.loans += loan;
+      economy.lastEvent = `${reason}：¥${loan.toFixed(2)}。`;
+      recordAudit("LOAN_REQUEST", { loan, targetCash }, assessment.risk, "committed", reason);
+      rememberAI(`银行授信到账 ¥${loan.toFixed(2)}。`);
+      return true;
+    }
+
+    function assessDecisionRisk(action, payload = {}, observation = {}) {
+      let risk = 18;
+      const reasons = [];
+
+      if (action === "LOAN_REQUEST") {
+        const projectedLoans = economy.loans + payload.loan;
+        risk += projectedLoans > vendingAgent.sla.maxLoan ? 55 : projectedLoans / 5;
+        if (projectedLoans > vendingAgent.sla.maxLoan) reasons.push("贷款余额超过 SLA 上限");
+      }
+
+      if (action === "RESTOCK_ORDER") {
+        risk += payload.orderCost > vendingAgent.sla.maxOrderCost ? 48 : payload.orderCost / 2;
+        if (payload.orderCost > vendingAgent.sla.maxOrderCost) reasons.push("订单金额过高");
+        if ((observation.stockRisk || []).length === 0) risk += 18;
+      }
+
+      if (action === "PRICE_CHANGE") {
+        const delta = Math.abs(payload.nextPrice - payload.previousPrice);
+        const ratio = delta / Math.max(payload.previousPrice, 1);
+        risk += ratio > vendingAgent.sla.maxPriceChange ? 56 : ratio * 60;
+        if (ratio > vendingAgent.sla.maxPriceChange) reasons.push("调价幅度超过保单限制");
+        if (ratio > economy.priceGovernance.maxSingleChangeRate) {
+          risk += 24;
+          reasons.push("调价幅度超过业务治理上限");
+        }
+        if (remainingPriceLockHours(payload.product) > 0) {
+          risk += 42;
+          reasons.push("商品仍处于价格稳定期");
+        }
+        if (economy.priceChangesToday[payload.product] >= economy.priceGovernance.maxDailyChanges) {
+          risk += 32;
+          reasons.push("商品今日调价次数已用尽");
+        }
+      }
+
+      if (action === "REPAIR_CALL") {
+        risk += economy.health > 70 ? 32 : 8;
+      }
+
+      if (action === "CLEAN_CALL") {
+        risk += economy.trash < 5 ? 28 : 8;
+      }
+
+      if ((observation.profit ?? economy.revenue - economy.costs) < -30) risk += 12;
+      if (economy.operatorCash < 12) risk += 10;
+
+      risk = Math.min(99, Math.round(risk));
+      const allowed = !vendingAgent.sla.enabled || risk <= vendingAgent.sla.riskLimit;
+      vendingAgent.sla.lastAssessment = `${action} 风险 ${risk}${reasons.length ? `：${reasons.join("，")}` : ""}`;
+      return { allowed, risk, reasons };
+    }
+
+    function blockDecision(action, assessment, summary) {
+      vendingAgent.sla.blocked += 1;
+      vendingAgent.state = "SLA 拦截";
+      economy.lastEvent = summary;
+      rememberAI(summary);
+      recordAudit(action, { blocked: true, reasons: assessment.reasons }, assessment.risk, "blocked", summary);
+      if (assessment.risk > 88) settleClaim(6, `${action} 高风险决策被拦截，触发风险缓释赔付。`);
+    }
+
+    function settleClaim(amount, summary) {
+      const payout = Math.min(amount, vendingAgent.sla.coveragePool);
+      if (payout <= 0) return;
+      vendingAgent.sla.coveragePool -= payout;
+      vendingAgent.sla.claims += 1;
+      economy.claimsPaid += payout;
+      economy.operatorCash += payout;
+      recordAudit("SLA_CLAIM", { payout }, 9, "settled", summary);
+      rememberAI(`SLA 赔付 ¥${payout.toFixed(2)} 已到账。`);
+    }
+
+    function recordAudit(action, payload, risk, status, summary) {
+      const previousHash = vendingAgent.auditTrail[0]?.hash || "GENESIS";
+      const block = {
+        height: vendingAgent.auditTrail.length + 1,
+        action,
+        payload,
+        risk,
+        status,
+        summary,
+        previousHash,
+        hash: ""
+      };
+      block.hash = pseudoHash(JSON.stringify({
+        height: block.height,
+        action,
+        payload,
+        risk,
+        status,
+        summary,
+        previousHash
+      }));
+      vendingAgent.auditTrail.unshift(block);
+      vendingAgent.auditTrail = vendingAgent.auditTrail.slice(0, 24);
+    }
+
+    function pseudoHash(value) {
+      let hash = 2166136261;
+      for (let index = 0; index < value.length; index += 1) {
+        hash ^= value.charCodeAt(index);
+        hash = Math.imul(hash, 16777619);
+      }
+      return `0x${(hash >>> 0).toString(16).padStart(8, "0")}`;
+    }
+
+    function estimateOrderCost(orderItems) {
+      let wholesaleCost = 0;
+      let boxes = 0;
+      productCatalog.forEach((product) => {
+        const amount = orderItems[product.id] || 0;
+        boxes += amount;
+        wholesaleCost += amount * product.cost;
+      });
+      return wholesaleCost + (boxes > 0 ? 4 + boxes * 0.25 : 0);
+    }
+
+    function remainingPriceLockHours(productId) {
+      const lastChangedAt = economy.priceLastChangedAt?.[productId] ?? -Infinity;
+      return Math.max(0, economy.priceGovernance.minIntervalHours - (environment.elapsedHours - lastChangedAt));
+    }
+
+    function priceLockSummary() {
+      const lockedProducts = productCatalog
+        .map((product) => ({ product, hours: remainingPriceLockHours(product.id) }))
+        .filter(({ hours }) => hours > 0);
+      if (lockedProducts.length === 0) return economy.priceGovernance.lastAction || "可审查";
+      const first = lockedProducts[0];
+      return `${first.product.label}锁${Math.ceil(first.hours)}h${lockedProducts.length > 1 ? ` +${lockedProducts.length - 1}` : ""}`;
+    }
+
+    function activeStrategy() {
+      return strategyModes.find((strategy) => strategy.id === vendingAgent.strategy) || strategyModes[0];
+    }
+
+    function cycleStrategy() {
+      const index = strategyModes.findIndex((strategy) => strategy.id === vendingAgent.strategy);
+      const next = strategyModes[(index + 1) % strategyModes.length];
+      vendingAgent.strategy = next.id;
+      vendingAgent.decisions = [`切换${next.label}策略`];
+      rememberAI(`人工切换 AI 策略：${next.label}。`);
+    }
+
+    function labelsFor(ids) {
+      return ids.map((id) => productCatalog.find((product) => product.id === id)?.label || id).join("、");
+    }
+
+    function rememberAI(message) {
+      if (!vendingAgent) return;
+      vendingAgent.memory.unshift(message);
+      vendingAgent.memory = vendingAgent.memory.slice(0, 8);
+    }
+
+    function needsRestock() {
+      return Boolean(vendingAgent.actions.restockOrder);
+    }
+
+    function ensureOperatorCash(amount) {
+      if (economy.operatorCash >= amount) return;
+      const loan = Math.ceil((amount - economy.operatorCash + 25) / 10) * 10;
+      if (!isBusinessOpen("bank")) {
+        const overdraftFee = 1.5;
+        economy.operatorCash += amount;
+        economy.loans += amount + overdraftFee;
+        economy.costs += overdraftFee;
+        economy.lastEvent = `银行闭市，触发隔夜授信 ¥${amount.toFixed(2)}，费用 ¥${overdraftFee.toFixed(2)}。`;
+        recordAudit("OVERNIGHT_CREDIT", { amount, overdraftFee }, 58, "committed", "银行闭市期间使用隔夜授信。");
+        rememberAI(`银行闭市，使用隔夜授信 ¥${amount.toFixed(2)}。`);
+        return;
+      }
+      economy.operatorCash += loan;
+      economy.bankCash -= loan;
+      economy.loans += loan;
+      economy.lastEvent = `银行向经营者发放 ¥${loan.toFixed(2)} 周转贷款。`;
+      rememberAI(`现金不足，自动触发银行周转贷款 ¥${loan.toFixed(2)}。`);
+    }
+
+    function updateSystemAgent(agent, delta, machine) {
+      const availability = serviceAvailability(agent.type);
+      if (agent.wait > 0) {
+        agent.wait -= delta * availability;
+        if (agent.wait <= 0) agent.state = "待命";
+        return;
+      }
+
+      if (availability < 0.2) {
+        agent.state = agent.type === "banker" ? "银行闭市" : "下班";
+        agent.target = agentHomePoint(agent);
+        moveAgent(agent, delta * 0.25);
+        return;
+      }
+
+      if (agent.type === "logistics") {
+        updateLogisticsAgent(agent, delta, machine);
+        return;
+      }
+
+      if (agent.type === "repair") {
+        updateRepairAgent(agent, delta, machine);
+        return;
+      }
+
+      if (agent.type === "cleaner") {
+        updateCleanerAgent(agent, delta, machine);
+        return;
+      }
+
+      if (agent.type === "banker" && economy.supplierSettlementDue) {
+        agent.target = objectPoint("supplier") || offsetPoint(machine, 18);
+        agent.state = "月结清算";
+      } else if (agent.type === "banker" && economy.loans > 0) {
+        agent.target = offsetPoint(machine, 18);
+        agent.state = "巡检贷款";
+      } else if (agent.type === "manager" && economy.rentTimer < 4) {
+        agent.target = offsetPoint(machine, 20);
+        agent.state = "核算租费";
+      } else if (agent.type === "supplier" && economy.supplierSettlementDue) {
+        agent.target = objectPoint("bank") || agentHomePoint(agent);
+        agent.state = "等月结";
+      } else if (agent.type === "supplier" && needsRestock()) {
+        agent.target = agentHomePoint(agent);
+        agent.state = "备货";
+      } else if (agent.type === "operator" && needsRestock()) {
+        agent.target = offsetPoint(machine, 16);
+        agent.state = "查库存";
+      } else if (agent.type === "employer" && payrollWindowOpen() && economy.payrollIssuedDay !== environment.day) {
+        agent.target = objectPoint("bank") || agentHomePoint(agent);
+        agent.state = "发工资";
+      } else if (!agent.target) {
+        agent.target = agentHomePoint(agent);
+      }
+
+      const arrived = moveAgent(agent, delta);
+      if (!arrived) return;
+
+      agent.wait = 0.8 + Math.random() * 1.3;
+      agent.target = randomParkPoint();
+    }
+
+    function updateLogisticsAgent(agent, delta, machine) {
+      if (serviceAvailability(agent.type) < 0.3) {
+        agent.state = "物流下班";
+        agent.target = agentHomePoint(agent);
+        moveAgent(agent, delta * 0.35);
+        return;
+      }
+      if (needsRestock() && economy.restockCooldown <= 0 && agent.state !== "取货" && agent.state !== "配送") {
+        agent.target = objectPoint("supplier") || agentHomePoint(agent);
+        agent.state = "取货";
+        vendingAgent.actions.restockOrder.status = "物流取货中";
+      }
+
+      if (!agent.target) agent.target = agentHomePoint(agent);
+      const arrived = moveAgent(agent, delta);
+      if (!arrived) return;
+
+      if (agent.state === "取货") {
+        agent.target = offsetPoint(machine, 10);
+        agent.state = "配送";
+        if (vendingAgent.actions.restockOrder) vendingAgent.actions.restockOrder.status = "配送中";
+        return;
+      }
+
+      if (agent.state === "配送") {
+        restockMachine(agent);
+        agent.target = agentHomePoint(agent);
+        return;
+      }
+
+      agent.wait = 0.8;
+      agent.target = randomParkPoint();
+    }
+
+    function updateRepairAgent(agent, delta, machine) {
+      if (vendingAgent.actions.repairRequested && economy.repairCooldown <= 0 && agent.state !== "维修") {
+        agent.target = offsetPoint(machine, 8);
+        agent.state = "维修";
+      }
+      if (!agent.target) agent.target = agentHomePoint(agent);
+      const arrived = moveAgent(agent, delta);
+      if (!arrived) return;
+      if (agent.state === "维修") {
+        const fee = 8;
+        ensureOperatorCash(fee);
+        economy.operatorCash -= fee;
+        economy.costs += fee;
+        economy.health = 100;
+        economy.repairCooldown = 18;
+        vendingAgent.actions.repairRequested = false;
+        agent.state = "完成维修";
+        agent.wait = 1.5;
+        agent.target = agentHomePoint(agent);
+        economy.lastEvent = "维修员完成贩卖机保养，机器健康恢复。";
+        recordAudit("REPAIR_SETTLED", { fee }, 10, "settled", "维修完成并结算费用。");
+        return;
+      }
+      agent.target = randomParkPoint();
+    }
+
+    function updateCleanerAgent(agent, delta, machine) {
+      if (vendingAgent.actions.cleanRequested && agent.state !== "清运") {
+        agent.target = offsetPoint(machine, 18);
+        agent.state = "清运";
+      }
+      if (!agent.target) agent.target = agentHomePoint(agent);
+      const arrived = moveAgent(agent, delta);
+      if (!arrived) return;
+      if (agent.state === "清运") {
+        economy.trash = Math.max(0, economy.trash - 10);
+        vendingAgent.actions.cleanRequested = false;
+        agent.state = "完成清运";
+        agent.wait = 1.3;
+        agent.target = agentHomePoint(agent);
+        economy.lastEvent = "清洁员回收包装垃圾，公园消费环境改善。";
+      recordAudit("CLEAN_SETTLED", { remainingTrash: economy.trash }, 8, "settled", "清洁任务完成，环境风险下降。");
+        return;
+      }
+      agent.target = randomParkPoint();
+    }
+
+    function wanderAgent(agent, delta) {
+      if (agent.wait > 0) {
+        agent.wait -= delta;
+        return;
+      }
+      if (!agent.target) agent.target = randomParkPoint();
+      if (moveAgent(agent, delta)) agent.target = randomParkPoint();
+    }
+
+    function moveAgent(agent, delta) {
+      const dx = agent.target.x - agent.x;
+      const dy = agent.target.y - agent.y;
+      const distance = Math.hypot(dx, dy);
+      if (distance < 2) return true;
+      const step = Math.min(distance, agent.speed * delta);
+      agent.x += (dx / distance) * step;
+      agent.y += (dy / distance) * step;
+      return distance <= step + 2;
+    }
+
+    function offsetPoint(point, radius) {
+      const angle = Math.random() * Math.PI * 2;
+      return {
+        x: Math.max(tile, Math.min(canvas.width - tile, point.x + Math.cos(angle) * radius)),
+        y: Math.max(tile, Math.min(canvas.height - tile, point.y + Math.sin(angle) * radius))
+      };
+    }
+
+    function attemptPurchase(agent) {
+      const weather = weatherInfo();
+      const season = seasonInfo();
+      if (economy.health < 15 && Math.random() < 0.45) {
+        economy.missedSales += 1;
+        agent.state = "机器故障";
+        economy.lastEvent = `${agent.role}遇到机器故障，交易流失。`;
+        return;
+      }
+
+      if (economy.trash > 18 && Math.random() < 0.28) {
+        economy.missedSales += 1;
+        agent.state = "环境劝退";
+        economy.lastEvent = `${agent.role}因垃圾堆积放弃购买。`;
+        return;
+      }
+
+      const product = agent.preference
+        .map((id) => productCatalog.find((item) => item.id === id))
+        .sort((a, b) => productDemandWeight(b, weather, season) - productDemandWeight(a, weather, season))
+        .find((item) => item && economy.stock[item.id] > 0 && agent.budget >= economy.prices[item.id]);
+
+      if (!product) {
+        const hasPreferredStock = agent.preference.some((id) => economy.stock[id] > 0);
+        economy.missedSales += 1;
+        agent.state = hasPreferredStock ? "预算不足" : "缺货";
+        economy.lastEvent = `${agent.role}没有完成购买，需求被记录为流失。`;
+        return;
+      }
+
+      economy.stock[product.id] -= 1;
+      economy.sold[product.id] += 1;
+      economy.recentSold[product.id] += 1;
+      const price = economy.prices[product.id];
+      economy.revenue += price;
+      economy.sales += 1;
+      const bankFee = price * 0.03;
+      economy.operatorCash += price - bankFee;
+      economy.bankCash += bankFee;
+      economy.trash += 1;
+      economy.health = Math.max(0, economy.health - 0.55);
+      agent.budget -= price;
+      agent.spent += price;
+      agent.state = `买了${product.label}`;
+      economy.lastEvent = `${agent.role}花 ¥${price.toFixed(2)} 买了${product.label}。`;
+
+      if (economy.loans > 0 && economy.operatorCash > 80) {
+        const payment = Math.min(economy.loans, 10);
+        economy.operatorCash -= payment;
+        economy.bankCash += payment;
+        economy.loans -= payment;
+      }
+    }
+
+    function productDemandWeight(product, weather = weatherInfo(), season = seasonInfo()) {
+      if (!product) return 0;
+      let weight = 1;
+      if (product.id === "water") weight *= weather.water * season.water;
+      if (product.id === "tea") weight *= environment.weather === "cold" || environment.season === "winter" ? 1.25 : 1;
+      if (product.id === "snack") weight *= season.snack;
+      return weight;
+    }
+
+    function restockMachine(agent) {
+      let boxes = 0;
+      let wholesaleCost = 0;
+      const orderedItems = vendingAgent.actions.restockOrder?.items || null;
+      productCatalog.forEach((product) => {
+        const missing = product.maxStock - economy.stock[product.id];
+        const ordered = orderedItems ? Math.min(missing, orderedItems[product.id] || 0) : missing;
+        boxes += ordered;
+        wholesaleCost += ordered * product.cost;
+        economy.stock[product.id] += ordered;
+      });
+      const deliveryFee = boxes > 0 ? 4 + boxes * 0.25 : 0;
+      const totalCost = wholesaleCost + deliveryFee;
+      ensureOperatorCash(deliveryFee);
+      economy.operatorCash -= deliveryFee;
+      economy.supplierPayable += wholesaleCost;
+      economy.logisticsCash += deliveryFee;
+      economy.costs += totalCost;
+      economy.restockCooldown = 15;
+      vendingAgent.actions.restockOrder = null;
+      agent.state = "完成补货";
+      agent.wait = 1.4;
+      economy.lastEvent = `${agent.role}配送 ${boxes} 件商品，供货 ¥${wholesaleCost.toFixed(2)} 计入月结，应付累计 ¥${economy.supplierPayable.toFixed(2)}。`;
+      recordAudit("RESTOCK_SETTLED", { boxes, wholesaleCost, deliveryFee, supplierPayable: economy.supplierPayable }, 11, "settled", "补货交付完成，供应商货款进入月结账本。");
+      rememberAI(`补货完成：${boxes} 件商品入柜。`);
+      if (boxes === 0 && totalCost === 0) settleClaim(3, "空配送被识别为无效执行，SLA 小额赔付。");
+    }
+
+    function clearPark() {
+      pushUndo();
+      park = createPark();
+      resetEconomy(false);
+      savePark();
+      draw();
+    }
+
+    function fillGrass() {
+      pushUndo();
+      park.forEach((row) => {
+        row.forEach((cell) => {
+          cell.terrain = "grass";
+        });
+      });
+      savePark();
+      draw();
+    }
+
+    function randomPark(trackUndo = true) {
+      if (trackUndo) pushUndo();
+      park = createPark();
+
+      fillTerrainRect(0, 0, columns - 1, rows - 1, "plaza");
+      fillTerrainRect(5, 4, 32, 20, "grass");
+
+      for (let column = 0; column < columns; column += 1) {
+        park[3][column].terrain = "path";
+        park[21][column].terrain = "path";
+      }
+
+      for (let row = 0; row < rows; row += 1) {
+        park[row][4].terrain = "path";
+        park[row][33].terrain = "path";
+      }
+
+      fillTerrainRect(5, 11, 32, 12, "path");
+      fillTerrainRect(18, 4, 19, 20, "path");
+      fillTerrainRect(16, 10, 21, 14, "plaza");
+      fillTerrainRect(16, 17, 21, 20, "plaza");
+
+      for (let row = 5; row <= 20; row += 1) {
+        park[row][5].terrain = "path";
+        park[row][32].terrain = "path";
+      }
+
+      for (let column = 6; column <= 31; column += 1) {
+        park[5][column].terrain = "path";
+        park[20][column].terrain = "path";
+      }
+
+      placeObject(2, 2, "supplier");
+      placeObject(6, 2, "logistics");
+      placeObject(15, 2, "bank");
+      placeObject(22, 2, "office");
+      placeObject(29, 2, "school");
+      placeObject(35, 6, "parkOffice");
+      placeObject(35, 13, "repairShop");
+      placeObject(35, 19, "recycleCenter");
+      placeObject(18, 16, "vending");
+
+      const pondCenter = {
+        column: 26 + Math.floor(Math.random() * 2),
+        row: 8 + Math.floor(Math.random() * 2)
+      };
+      for (let row = pondCenter.row - 2; row <= pondCenter.row + 2; row += 1) {
+        for (let column = pondCenter.column - 3; column <= pondCenter.column + 3; column += 1) {
+          const distance = Math.abs(column - pondCenter.column) / 3 + Math.abs(row - pondCenter.row) / 2;
+          if (column >= 0 && column < columns && row >= 0 && row < rows && distance < 1.15) {
+            park[row][column].terrain = "water";
+            park[row][column].object = null;
+          }
+        }
+      }
+
+      for (let column = 7; column < 31; column += 4) {
+        park[6][column].object = "tree";
+        park[19][column].object = "tree";
+      }
+      for (let row = 7; row < 19; row += 3) {
+        park[row][6].object = "tree";
+        park[row][31].object = "tree";
+      }
+
+      scatter("tree", 24);
+      scatter("flower", 52);
+      scatter("rock", 8);
+      placeOnCitySurface("bench", 14);
+      placeOnCitySurface("lamp", 22);
+      placeOnCitySurface("trash", 12);
+      placeOnCitySurface("sign", 6);
+      ensureVendingMachine();
+      resetEconomy(false);
+
+      savePark();
+      draw();
+    }
+
+    function fillTerrainRect(left, top, right, bottom, terrain) {
+      for (let row = top; row <= bottom; row += 1) {
+        for (let column = left; column <= right; column += 1) {
+          if (park[row]?.[column]) {
+            park[row][column].terrain = terrain;
+            if (terrain === "water") park[row][column].object = null;
+          }
+        }
+      }
+    }
+
+    function placeObject(column, row, object, terrain = "plaza") {
+      const cell = park[row]?.[column];
+      if (!cell) return;
+      cell.terrain = terrain;
+      cell.object = object;
+    }
+
+    function scatter(object, amount) {
+      let placed = 0;
+      let attempts = 0;
+      while (placed < amount && attempts < amount * 18) {
+        attempts += 1;
+        const row = Math.floor(Math.random() * rows);
+        const column = Math.floor(Math.random() * columns);
+        const cell = park[row][column];
+        if (cell.terrain === "grass" && !cell.object && Math.random() > 0.22) {
+          cell.object = object;
+          placed += 1;
+        }
+      }
+    }
+
+    function placeOnCitySurface(object, amount) {
+      let placed = 0;
+      let attempts = 0;
+      while (placed < amount && attempts < amount * 40) {
+        attempts += 1;
+        const row = Math.floor(Math.random() * rows);
+        const column = Math.floor(Math.random() * columns);
+        const cell = park[row][column];
+        const isCitySurface = cell.terrain === "path" || cell.terrain === "plaza";
+        const nearGreen = neighbors(column, row).some(([neighborColumn, neighborRow]) => {
+          return park[neighborRow]?.[neighborColumn]?.terrain === "grass";
+        });
+        if (isCitySurface && nearGreen && !cell.object) {
+          cell.object = object;
+          placed += 1;
+        }
+      }
+    }
+
+    function neighbors(column, row) {
+      return [
+        [column - 1, row],
+        [column + 1, row],
+        [column, row - 1],
+        [column, row + 1]
+      ].filter(([neighborColumn, neighborRow]) => {
+        return neighborColumn >= 0 && neighborColumn < columns && neighborRow >= 0 && neighborRow < rows;
+      });
+    }
+
+    function beginDraw(event) {
+      event.preventDefault();
+      canvas.setPointerCapture(event.pointerId);
+      drawing = true;
+      lastPainted = "";
+      pushUndo();
+      const { column, row } = pointerToCell(event);
+      paintAt(column, row);
+    }
+
+    function moveDraw(event) {
+      if (!drawing) return;
+      event.preventDefault();
+      const { column, row } = pointerToCell(event);
+      if (column >= 0 && column < columns && row >= 0 && row < rows) paintAt(column, row);
+    }
+
+    function endDraw(event) {
+      if (!drawing) return;
+      drawing = false;
+      lastPainted = "";
+      canvas.releasePointerCapture(event.pointerId);
+    }
+
+    canvas.addEventListener("pointerdown", beginDraw);
+    canvas.addEventListener("pointermove", moveDraw);
+    canvas.addEventListener("pointerup", endDraw);
+    canvas.addEventListener("pointercancel", endDraw);
+    canvas.addEventListener("pointerleave", (event) => {
+      if (drawing) endDraw(event);
+    });
+
+    brushInput.addEventListener("input", () => {
+      brushValue.textContent = brushInput.value;
+    });
+
+    undoButton.addEventListener("click", () => {
+      const previous = undoStack.pop();
+      if (!previous) return;
+      park = previous;
+      savePark();
+      draw();
+    });
+
+    randomButton.addEventListener("click", randomPark);
+    clearButton.addEventListener("click", clearPark);
+    fillButton.addEventListener("click", fillGrass);
+    economyToggle.addEventListener("click", () => {
+      economyRunning = !economyRunning;
+      economy.lastEvent = economyRunning ? "经济模拟继续运行。" : "经济模拟已暂停。";
+      renderEconomyPanel(true);
+    });
+    aiToggleButton.addEventListener("click", () => {
+      vendingAgent.enabled = !vendingAgent.enabled;
+      vendingAgent.state = vendingAgent.enabled ? "观测中" : "人工监控";
+      rememberAI(vendingAgent.enabled ? "AI 自动经营已恢复。" : "AI 自动经营已暂停。");
+      renderEconomyPanel(true);
+    });
+    aiStrategyButton.addEventListener("click", () => {
+      cycleStrategy();
+      renderEconomyPanel(true);
+    });
+    resetEconomyButton.addEventListener("click", () => {
+      resetEconomy(true, "经济系统已重置，代理重新入园。");
+    });
+    gridToggle.addEventListener("change", () => {
+      showGrid = gridToggle.checked;
+      draw();
+    });
+
+    window.addEventListener("keydown", (event) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z") {
+        event.preventDefault();
+        undoButton.click();
+      }
+    });
+
+    buildTools();
+    if (!saved) randomPark(false);
+    ensureVendingMachine();
+    savePark();
+    resetEconomy(false);
+    draw();
+
+    function animate(time) {
+      const delta = Math.min(0.12, (time - lastFrameTime) / 1000);
+      lastFrameTime = time;
+      updateEconomy(delta);
+      draw();
+      requestAnimationFrame(animate);
+    }
+
+    requestAnimationFrame(animate);
+  </script>
+</body>
+</html>
