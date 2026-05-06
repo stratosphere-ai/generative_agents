@@ -41,6 +41,16 @@ def state_preamble(persona: Any) -> str:
         lines.append("## Environment")
         lines.extend(env.summary_lines())
 
+    ledger = getattr(persona, "supplier_ledger", None)
+    if ledger is not None:
+        lines.append("## Supplier ledger (Japanese commercial cycle)")
+        lines.extend(ledger.summary_lines())
+
+    report = getattr(persona, "daily_report_log", None)
+    if report is not None:
+        lines.append("## Yesterday's daily report")
+        lines.extend(report.summary_lines())
+
     return "\n".join(lines)
 
 

@@ -149,6 +149,55 @@ provider = HttpWeatherProvider(
 )
 ```
 
+## Supplier ledger (Japanese commercial cycle)
+
+`vending/supplier.py` models 掛取引 / 締め支払い: orders accumulate as
+`open_orders`, get aggregated into a `PendingInvoice` on each contract's
+締め日 (cutoff_day) with consumption tax + 振込手数料 baked in, then debit
+Vendy's cash on the 支払日 (payment_day).
+
+Three preset terms ship as helper constructors:
+
+| Helper                            | Term (in JP)                | Cycle      | Use case |
+|-----------------------------------|-----------------------------|-----------:|----------|
+| `matsujime_yokugetsu_matsu`       | 末締め翌月末払い              | ~60 days   | most common B2B credit |
+| `hatsuka_jime_yokugetsu_tooka`    | 20日締め翌月10日払い          | ~21 days   | shorter food/drink cycle |
+| `sokukin`                         | 即金                         | 0 days     | cash-on-delivery, no fee |
+
+Anything more exotic (手形 90/120 day notes, 検収締め 検収後支払い, 早割
+1-2% off) is just a parameter tweak on `SupplierContract`:
+`payment_offset_months`, `transfer_fee_cents_buyer`, `early_payment_discount`.
+
+Tax rate defaults to 軽減税率 8% (vending machine drinks/snacks fall under
+飲食料品の譲渡); pass `consumption_tax_rate=TAX_RATE_STANDARD` (10%) for
+non-food items.
+
+`ledger.tick(today, cash_balance_cents=...)` is the single entry point;
+call it once per simulated day and it returns `{cut, paid, cash_after_cents}`.
+On insufficient funds it raises `InsufficientFundsError`.
+
+The ledger is auto-loaded from
+`personas/<vendy>/bootstrap_memory/supplier_ledger.json` at sim start;
+omit the file to start with no contracts (即金-only).
+
+## Daily report reflection
+
+`vending/daily_report.py` accumulates per-day KPIs (sales / revenue / cost /
+missed / SLA blocks / audit count / weather samples) and at midnight emits
+a `DailyReport` with a natural-language `thought_text` plus combined
+weather/season/holiday context. The report is mounted on the persona as
+`daily_report_log` and surfaces in the prompt preamble under
+`## Yesterday's daily report`, so Vendy's next plan sees yesterday's outcome
+verbatim.
+
+Wire it into the cognitive loop by:
+1. calling `log.record_sale(price, cost)` from `transaction.sell` (already
+   the only purchase entry point),
+2. calling `log.record_block()` and `log.record_audit()` from the SLA /
+   registry adapter listeners,
+3. calling `log.begin_day(date_iso, cash, payable)` and `log.close_day(...)`
+   at midnight; persisting via `log.save(persona._daily_report_path)`.
+
 ## Per-persona model routing
 
 `reverie/backend_server/vending/model_router.py` monkey-patches

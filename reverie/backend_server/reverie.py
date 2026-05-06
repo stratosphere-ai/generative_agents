@@ -39,6 +39,8 @@ from vending.registry_adapter import TaskRegistryAdapter
 from vending.state import VendingState
 from vending.sla import SLAState
 from vending.price_governance import PriceGovernance
+from vending.supplier import SupplierLedger
+from vending.daily_report import DailyReportLog
 from vending.environment_cycle import from_env as _build_env_cycle
 from vending.prompt_inject import attach_to_persona as _attach_vending_prompt
 from vending.model_router import install as _install_model_router, with_persona as _with_persona
@@ -180,12 +182,18 @@ class ReverieServer:
         persona._vending_state_path = vs_path
 
         bm_dir = vs_path.parent
-        sla_path = bm_dir / "sla_state.json"
-        gov_path = bm_dir / "price_governance.json"
-        persona.sla_state = SLAState.load(sla_path)
-        persona._sla_state_path = sla_path
-        persona.price_governance = PriceGovernance.load(gov_path)
+        sla_path      = bm_dir / "sla_state.json"
+        gov_path      = bm_dir / "price_governance.json"
+        supplier_path = bm_dir / "supplier_ledger.json"
+        report_path   = bm_dir / "daily_report.json"
+        persona.sla_state              = SLAState.load(sla_path)
+        persona._sla_state_path        = sla_path
+        persona.price_governance       = PriceGovernance.load(gov_path)
         persona._price_governance_path = gov_path
+        persona.supplier_ledger        = SupplierLedger.load(supplier_path)
+        persona._supplier_ledger_path  = supplier_path
+        persona.daily_report_log       = DailyReportLog.load(report_path)
+        persona._daily_report_path     = report_path
 
         _attach_vending_prompt(persona)
 
