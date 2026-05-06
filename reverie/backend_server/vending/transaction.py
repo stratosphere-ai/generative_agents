@@ -38,8 +38,24 @@ def sell(
     vendy_local_uuid_parent: str | None = None,
 ) -> Receipt:
     if sku not in state.prices_cents:
+        bus.publish({
+            "kind":      "transaction_missed",
+            "persona":   "Vendy Unit-001",
+            "sku":       sku,
+            "customer":  customer,
+            "timestamp": timestamp_iso,
+            "reason":    "unknown_sku",
+        })
         raise UnknownSku(sku)
     if state.inventory.get(sku, 0) <= 0:
+        bus.publish({
+            "kind":      "transaction_missed",
+            "persona":   "Vendy Unit-001",
+            "sku":       sku,
+            "customer":  customer,
+            "timestamp": timestamp_iso,
+            "reason":    "out_of_stock",
+        })
         raise OutOfStock(sku)
 
     price = state.prices_cents[sku]
@@ -58,3 +74,22 @@ def sell(
         "parent_local_uuid": vendy_local_uuid_parent,
     })
     return receipt
+
+
+def try_sell(
+    state: VendingState,
+    *,
+    sku: str,
+    customer: str,
+    timestamp_iso: str,
+    vendy_local_uuid_parent: str | None = None,
+) -> Receipt | None:
+    """Non-raising variant: returns None on UnknownSku/OutOfStock (still publishes events)."""
+    try:
+        return sell(
+            state,
+            sku=sku, customer=customer, timestamp_iso=timestamp_iso,
+            vendy_local_uuid_parent=vendy_local_uuid_parent,
+        )
+    except (OutOfStock, UnknownSku):
+        return None

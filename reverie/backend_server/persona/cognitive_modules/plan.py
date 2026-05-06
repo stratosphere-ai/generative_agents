@@ -967,11 +967,27 @@ def plan(persona, maze, personas, new_day, retrieved):
     The target action address of the persona (persona.scratch.act_address).
   """ 
   # PART 0: Emit hourly_start / hourly_end on cross-hour boundaries so the
-  # vending TaskRegistry adapter can record HOURLY parent tasks.
+  # vending TaskRegistry adapter can record HOURLY parent tasks. Day boundary
+  # also fires day_start / day_end so DailyReportListener can roll KPIs.
   if _vending_bus is not None:
     last_hour = getattr(persona, "_vending_last_hour", None)
+    last_date = getattr(persona, "_vending_last_date", None)
     cur_hour  = persona.scratch.curr_time.hour
     cur_date  = persona.scratch.curr_time.date().isoformat()
+    if last_date != cur_date:
+      if last_date is not None:
+        _vending_bus.publish({
+          "kind":         "day_end",
+          "persona":      persona.name,
+          "date":         last_date,
+          "completed_at": persona.scratch.curr_time.isoformat(),
+        })
+      _vending_bus.publish({
+        "kind":    "day_start",
+        "persona": persona.name,
+        "date":    cur_date,
+      })
+      persona._vending_last_date = cur_date
     if last_hour != cur_hour:
       if last_hour is not None:
         _vending_bus.publish({

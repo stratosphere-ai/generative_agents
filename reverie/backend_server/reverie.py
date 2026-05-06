@@ -41,6 +41,7 @@ from vending.sla import SLAState
 from vending.price_governance import PriceGovernance
 from vending.supplier import SupplierLedger
 from vending.daily_report import DailyReportLog
+from vending.daily_report_listener import DailyReportListener
 from vending.environment_cycle import from_env as _build_env_cycle
 from vending.prompt_inject import attach_to_persona as _attach_vending_prompt
 from vending.model_router import install as _install_model_router, with_persona as _with_persona
@@ -212,9 +213,13 @@ class ReverieServer:
       # Build the environment cycle once and refresh env_snapshot on each
       # persona that has vending_state, so prompt_inject can surface weather.
       self._env_cycle = _build_env_cycle()
+      self._daily_report_listeners = []
       for persona in self.personas.values():
         if getattr(persona, "vending_state", None):
           persona.env_snapshot = self._env_cycle.snapshot(self.curr_time)
+          listener = DailyReportListener(persona)
+          listener.attach()
+          self._daily_report_listeners.append(listener)
 
 
   def save(self):
@@ -465,10 +470,34 @@ class ReverieServer:
           with open(curr_move_file, "w") as outfile: 
             outfile.write(json.dumps(movements, indent=2))
 
-          # After this cycle, the world takes one step forward, and the 
-          # current time moves by <sec_per_step> amount. 
+          # After this cycle, the world takes one step forward, and the
+          # current time moves by <sec_per_step> amount.
           self.step += 1
           self.curr_time += datetime.timedelta(seconds=self.sec_per_step)
+
+          # Refresh weather snapshot + publish env_tick so the daily-report
+          # listener can sample traffic and label the active environment.
+          if getattr(self, "_env_cycle", None) is not None:
+            snap = self._env_cycle.snapshot(self.curr_time)
+            for persona in self.personas.values():
+              if getattr(persona, "vending_state", None):
+                persona.env_snapshot = snap
+                _vending_bus.publish({
+                  "kind":          "env_tick",
+                  "persona":       persona.name,
+                  "traffic_index": snap.traffic_multiplier,
+                  "weather_label": snap.weather.label,
+                  "season_label":  snap.season.label,
+                  "holiday_label": snap.holiday,
+                })
+                # Run supplier cutoff/payment events at midnight so AP rolls.
+                ledger = getattr(persona, "supplier_ledger", None)
+                if ledger is not None and self.curr_time.hour == 0 and self.curr_time.minute == 0 and self.curr_time.second < self.sec_per_step:
+                  try:
+                    ledger.tick(self.curr_time.date(), cash_balance_cents=persona.vending_state.cash_balance_cents)
+                  except Exception:                            # noqa: BLE001
+                    # Insufficient funds or similar — surfaced via journal/log.
+                    pass
 
           int_counter -= 1
           

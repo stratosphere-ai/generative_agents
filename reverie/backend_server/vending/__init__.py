@@ -15,8 +15,10 @@ from .supplier import (
     TAX_RATE_FOOD_DRINK_REDUCED, TAX_RATE_STANDARD,
 )
 from .daily_report import DailyReportLog, DailyReport, DailySnapshot
+from .daily_report_listener import DailyReportListener
 
 __all__ = [
+    "DailyReportListener",
     "bus", "VendingState", "CafeState", "SLAState", "Assessment", "PriceGovernance",
     "EnvironmentCycle", "EnvironmentSnapshot", "Weather", "Season",
     "SimulatedWeatherProvider", "HttpWeatherProvider", "WEATHERS", "SEASONS",
