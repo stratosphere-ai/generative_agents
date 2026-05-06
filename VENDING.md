@@ -93,6 +93,62 @@ In Live mode `index.html` overrides:
 The rule sim is paused in Live mode so it doesn't fight the backend feed.
 Toggling Live off restores the playground.
 
+## Weather + season + holiday
+
+`vending/environment_cycle.py` exposes an `EnvironmentCycle` that binds a
+pluggable `WeatherProvider` to a deterministic season + holiday calendar
+and emits an `EnvironmentSnapshot` with traffic / demand / per-SKU
+multipliers. The snapshot is mounted on Vendy as `persona.env_snapshot`
+at sim start, so the prompt preamble grows a `## Environment` section
+showing today's weather, season, holiday, and combined multipliers.
+
+`customer_spawner.expected_arrivals(hour, env=...)` scales every
+persona's hour PDF by `env.traffic_multiplier` (capped at 1.0).
+
+### Providers
+
+| Provider | When to use |
+|---|---|
+| `SimulatedWeatherProvider` | default; random walk seeded by date with summer/winter-biased distributions ported from `index.html` |
+| `HttpWeatherProvider`     | real meteorology API (OpenWeatherMap / QWeather / NWS / CMA) — TTL-cached, falls back to simulated on error |
+
+Selecting a provider via env vars:
+
+```bash
+# default — pure simulation
+unset WEATHER_PROVIDER
+
+# real-world feed
+export WEATHER_PROVIDER=http
+export WEATHER_API_URL='https://api.openweathermap.org/data/2.5/weather?lat=31.23&lon=121.47&appid=YOUR_KEY'
+export WEATHER_TTL_SEC=600
+```
+
+`reverie.py` calls `from_env()` at sim start, so just exporting the vars
+flips the source.
+
+### Wiring a different vendor
+
+Pass a custom `mapper` to `HttpWeatherProvider` if you need to translate a
+non-OpenWeatherMap response shape:
+
+```python
+from vending.environment_cycle import HttpWeatherProvider, Weather, WEATHERS
+
+def qweather_mapper(payload):
+    code = payload["now"]["icon"]   # QWeather icon code
+    if code in {"305","306","307","308","399"}: return WEATHERS["rain"]
+    if code in {"401","402","406","407","408","499"}: return WEATHERS["cold"]
+    if code in {"100","150"}: return WEATHERS["sunny"]
+    return WEATHERS["cloudy"]
+
+provider = HttpWeatherProvider(
+    url="https://devapi.qweather.com/v7/weather/now?location=101020100&key=KEY",
+    mapper=qweather_mapper,
+    ttl_sec=600,
+)
+```
+
 ## Per-persona model routing
 
 `reverie/backend_server/vending/model_router.py` monkey-patches

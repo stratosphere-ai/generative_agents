@@ -36,6 +36,11 @@ def state_preamble(persona: Any) -> str:
         lines.append("## Price governance")
         lines.extend(gov.summary_lines())
 
+    env = getattr(persona, "env_snapshot", None)
+    if env is not None:
+        lines.append("## Environment")
+        lines.extend(env.summary_lines())
+
     return "\n".join(lines)
 
 

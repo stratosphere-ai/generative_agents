@@ -39,6 +39,7 @@ from vending.registry_adapter import TaskRegistryAdapter
 from vending.state import VendingState
 from vending.sla import SLAState
 from vending.price_governance import PriceGovernance
+from vending.environment_cycle import from_env as _build_env_cycle
 from vending.prompt_inject import attach_to_persona as _attach_vending_prompt
 from vending.model_router import install as _install_model_router, with_persona as _with_persona
 from blockchain.config import load_config as _load_blockchain_config
@@ -199,6 +200,13 @@ class ReverieServer:
       self._task_registry_adapter = TaskRegistryAdapter(self._task_registry_client)
       self._task_registry_adapter.attach()
       _install_model_router()
+
+      # Build the environment cycle once and refresh env_snapshot on each
+      # persona that has vending_state, so prompt_inject can surface weather.
+      self._env_cycle = _build_env_cycle()
+      for persona in self.personas.values():
+        if getattr(persona, "vending_state", None):
+          persona.env_snapshot = self._env_cycle.snapshot(self.curr_time)
 
 
   def save(self):
