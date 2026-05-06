@@ -37,6 +37,8 @@ from persona.persona import *
 from vending.events import bus as _vending_bus
 from vending.registry_adapter import TaskRegistryAdapter
 from vending.state import VendingState
+from vending.sla import SLAState
+from vending.price_governance import PriceGovernance
 from vending.prompt_inject import attach_to_persona as _attach_vending_prompt
 from vending.model_router import install as _install_model_router, with_persona as _with_persona
 from blockchain.config import load_config as _load_blockchain_config
@@ -175,6 +177,15 @@ class ReverieServer:
       if vs_path.exists():
         persona.vending_state = VendingState.load(vs_path)
         persona._vending_state_path = vs_path
+
+        bm_dir = vs_path.parent
+        sla_path = bm_dir / "sla_state.json"
+        gov_path = bm_dir / "price_governance.json"
+        persona.sla_state = SLAState.load(sla_path)
+        persona._sla_state_path = sla_path
+        persona.price_governance = PriceGovernance.load(gov_path)
+        persona._price_governance_path = gov_path
+
         _attach_vending_prompt(persona)
 
     if any(getattr(p, "vending_state", None) for p in self.personas.values()):

@@ -25,6 +25,17 @@ def state_preamble(persona: Any) -> str:
     ]
     if state.last_restock_iso:
         lines.append(f"- last restock: {state.last_restock_iso}")
+
+    sla = getattr(persona, "sla_state", None)
+    if sla is not None:
+        lines.append("## SLA guardrails")
+        lines.extend(sla.summary_lines())
+
+    gov = getattr(persona, "price_governance", None)
+    if gov is not None:
+        lines.append("## Price governance")
+        lines.extend(gov.summary_lines())
+
     return "\n".join(lines)
 
 
