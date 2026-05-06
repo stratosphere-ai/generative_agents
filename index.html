@@ -881,8 +881,16 @@
           <div class="economy-head">
             <span>贩卖机经济</span>
             <button class="action mini" id="economyToggle" type="button">暂停</button>
+            <button class="action mini" id="liveModeToggle" type="button" title="对接 Django /api/vending 后端">Live</button>
           </div>
           <div class="economy-status" id="economyStatus">等待自动贩卖机</div>
+          <div class="live-config" style="display:none;font-size:0.78rem;color:var(--muted);margin-top:6px;" id="liveConfig">
+            <label style="display:flex;gap:6px;align-items:center;">
+              <span>sim</span>
+              <input id="liveSimInput" type="text" placeholder="vending_e2e_..." style="flex:1;font-size:0.78rem;padding:2px 4px;">
+            </label>
+            <div id="liveStatus" style="margin-top:4px;"></div>
+          </div>
           <div class="ai-section" aria-label="城市环境系统">
             <div class="ai-title">
               <span>城市环境</span>
@@ -1017,6 +1025,10 @@
     const aiMemoryList = document.querySelector("#aiMemoryList");
     const stockList = document.querySelector("#stockList");
     const agentList = document.querySelector("#agentList");
+    const liveModeToggle = document.querySelector("#liveModeToggle");
+    const liveConfig     = document.querySelector("#liveConfig");
+    const liveSimInput   = document.querySelector("#liveSimInput");
+    const liveStatus     = document.querySelector("#liveStatus");
 
     const tools = [
       { id: "grass", label: "草地", kind: "terrain", swatch: "grass" },
@@ -1060,10 +1072,14 @@
       recycleCenter: { color: "#4f876b", roof: "#35644d", label: "回" }
     };
 
+    // SKU ids match the backend's VendingState (case-sensitive). When live mode
+    // is on, the dashboard reads stock/prices from the backend keyed by these ids.
     const productCatalog = [
-      { id: "water", label: "水", price: 3, cost: 1, maxStock: 18, color: "#58a7d3" },
-      { id: "tea", label: "茶", price: 4, cost: 1.4, maxStock: 14, color: "#7ab45d" },
-      { id: "snack", label: "点心", price: 5, cost: 2, maxStock: 12, color: "#d9a441" }
+      { id: "Water",     label: "水",     price: 1.0, cost: 0.4, maxStock: 18, color: "#58a7d3" },
+      { id: "Coke",      label: "可乐",   price: 1.5, cost: 0.6, maxStock: 20, color: "#c44d31" },
+      { id: "Coffee",    label: "咖啡",   price: 2.5, cost: 1.0, maxStock: 12, color: "#7a5235" },
+      { id: "Chips",     label: "薯片",   price: 2.0, cost: 0.8, maxStock: 10, color: "#d9a441" },
+      { id: "Chocolate", label: "巧克力", price: 1.75, cost: 0.7, maxStock: 8,  color: "#5a3a26" }
     ];
 
     const strategyModes = [
@@ -1098,10 +1114,10 @@
     };
 
     const roleTemplates = [
-      { role: "上班族", type: "consumer", color: "#2f628a", budget: 18, demand: 0.55, preference: ["tea", "water"], home: "office", entry: "west" },
-      { role: "学生", type: "consumer", color: "#ba4e6a", budget: 12, demand: 0.72, preference: ["snack", "water"], home: "school", entry: "south" },
-      { role: "游客", type: "consumer", color: "#7c5bb2", budget: 22, demand: 0.62, preference: ["water", "tea"], home: "parkOffice", entry: "east" },
-      { role: "跑步者", type: "consumer", color: "#d36d3b", budget: 10, demand: 0.8, preference: ["water"], home: "parkOffice", entry: "north" },
+      { role: "上班族", type: "consumer", color: "#2f628a", budget: 18, demand: 0.55, preference: ["Coffee", "Water"],         home: "office",     entry: "west" },
+      { role: "学生",   type: "consumer", color: "#ba4e6a", budget: 12, demand: 0.72, preference: ["Chips", "Chocolate"],      home: "school",     entry: "south" },
+      { role: "游客",   type: "consumer", color: "#7c5bb2", budget: 22, demand: 0.62, preference: ["Water", "Coke"],           home: "parkOffice", entry: "east" },
+      { role: "跑步者", type: "consumer", color: "#d36d3b", budget: 10, demand: 0.8,  preference: ["Water"],                   home: "parkOffice", entry: "north" },
       { role: "经营者", type: "operator", color: "#4d6f9f", budget: 0, demand: 0, preference: [], home: "office", entry: "west" },
       { role: "供货商", type: "supplier", color: "#9b6e57", budget: 0, demand: 0, preference: [], home: "supplier", entry: "west" },
       { role: "物流员", type: "logistics", color: "#3f8f8a", budget: 0, demand: 0, preference: [], home: "logistics", entry: "west" },
@@ -1124,6 +1140,18 @@
     let economyRunning = true;
     let lastFrameTime = performance.now();
     let lastEconomyUiUpdate = 0;
+
+    // ----- Live mode (Path A): consume real /api/vending/* feeds ------------
+    // When enabled, the rule sim is paused and the dashboard reflects state
+    // pulled from the Django backend's vending_state.json + journal.jsonl.
+    let liveMode        = false;
+    let liveSimCode     = (() => {
+      try { return window.localStorage.getItem("micro-city-live-sim") || ""; }
+      catch (_) { return ""; }
+    })();
+    let liveTimerId     = null;
+    let liveJournalSeen = 0;
+    const liveApiBase   = ""; // same-origin; set to "http://localhost:8000" if cross-host
     let economy = createEconomy();
     let agents = createAgents();
     let vendingAgent = createVendingAgent();
@@ -3320,6 +3348,134 @@
       economy.lastEvent = economyRunning ? "经济模拟继续运行。" : "经济模拟已暂停。";
       renderEconomyPanel(true);
     });
+
+    liveModeToggle.addEventListener("click", () => {
+      setLiveMode(!liveMode);
+    });
+    liveSimInput.value = liveSimCode;
+    liveSimInput.addEventListener("change", () => {
+      liveSimCode = liveSimInput.value.trim();
+      try { window.localStorage.setItem("micro-city-live-sim", liveSimCode); } catch (_) {}
+      liveJournalSeen = 0;
+      if (liveMode) restartLiveTimer();
+    });
+
+    function setLiveMode(on) {
+      liveMode = on;
+      liveModeToggle.textContent = on ? "Live ●" : "Live";
+      liveModeToggle.classList.toggle("primary", on);
+      liveConfig.style.display   = on ? "block" : "none";
+      if (on) {
+        // Pause the rule-based sim so it doesn't fight the backend feed.
+        economyRunning = false;
+        economyToggle.textContent = "运行";
+        economy.lastEvent = "Live 模式：从 /api/vending 拉取真实状态。";
+        liveJournalSeen = 0;
+        restartLiveTimer();
+        liveTick(true);
+      } else {
+        if (liveTimerId) { clearInterval(liveTimerId); liveTimerId = null; }
+        economy.lastEvent = "回到 Playground，规则模拟继续。";
+        economyRunning = true;
+        economyToggle.textContent = "暂停";
+        liveStatus.textContent = "";
+      }
+      renderEconomyPanel(true);
+    }
+
+    function restartLiveTimer() {
+      if (liveTimerId) clearInterval(liveTimerId);
+      liveTimerId = setInterval(() => liveTick(false), 1500);
+    }
+
+    async function liveTick(force) {
+      if (!liveMode) return;
+      if (!liveSimCode) {
+        liveStatus.textContent = "请填写 sim_code";
+        return;
+      }
+      try {
+        const [stateRes, journalRes, personasRes] = await Promise.all([
+          fetch(`${liveApiBase}/api/vending/state/${encodeURIComponent(liveSimCode)}/`),
+          fetch(`${liveApiBase}/api/vending/journal/${encodeURIComponent(liveSimCode)}/?since=${liveJournalSeen}`),
+          fetch(`${liveApiBase}/api/vending/personas/${encodeURIComponent(liveSimCode)}/`)
+        ]);
+        if (!stateRes.ok) {
+          liveStatus.textContent = `state ${stateRes.status}`;
+          return;
+        }
+        const state    = await stateRes.json();
+        const journal  = journalRes.ok  ? await journalRes.json()  : { entries: [], count: 0 };
+        const personas = personasRes.ok ? await personasRes.json() : { personas: [] };
+        applyLiveState(state, journal, personas, force);
+        liveStatus.textContent = `${state.curr_time || ""}  step ${state.step ?? "?"}  +${journal.count} 条`;
+      } catch (err) {
+        liveStatus.textContent = `离线：${err.message || err}`;
+      }
+    }
+
+    function applyLiveState(stateBody, journalBody, personasBody, force) {
+      // 1. Inventory + prices come from VendingState.
+      const vs = stateBody.vending_state || {};
+      if (vs.inventory) {
+        for (const [sku, qty] of Object.entries(vs.inventory)) {
+          if (sku in economy.stock) economy.stock[sku] = qty;
+        }
+      }
+      if (vs.prices_cents) {
+        for (const [sku, cents] of Object.entries(vs.prices_cents)) {
+          if (sku in economy.prices) economy.prices[sku] = cents / 100;
+        }
+      }
+      if (typeof vs.cash_balance_cents === "number") {
+        economy.operatorCash = vs.cash_balance_cents / 100;
+        economy.revenue      = vs.cash_balance_cents / 100;
+      }
+      if (typeof vs.power_pct === "number") {
+        economy.health = vs.power_pct;
+      }
+
+      // 2. Journal entries become audit-trail blocks.
+      if (journalBody.count > 0) {
+        liveJournalSeen += journalBody.count;
+        for (const entry of journalBody.entries) {
+          const action = (entry.kind || "").toUpperCase();
+          const status = action.startsWith("TX_")   ? "committed"
+                       : action === "INTENT_FAIL"  ? "failed"
+                       : action.startsWith("INTENT_") ? "queued"
+                       : "noted";
+          recordAudit(action,
+                      { local_uuid: entry.local_uuid, on_chain_id: entry.on_chain_id, tx_hash: entry.tx_hash },
+                      6, status,
+                      entry.description || entry.tx_hash || entry.local_uuid || entry.kind);
+        }
+      }
+
+      // 3. Persona positions: minimal mapping into the rendered agent list.
+      if (Array.isArray(personasBody.personas)) {
+        agents = personasBody.personas.map((p, i) => {
+          const cellSize = (canvas.width / columns) || 32;
+          return {
+            role:   p.name,
+            type:   p.role === "vendor" ? "operator" : "consumer",
+            color:  p.role === "vendor" ? "#4d6f9f"  : "#ba4e6a",
+            x:      (p.x || 0) * cellSize,
+            y:      (p.y || 0) * cellSize,
+            cellX:  p.x,
+            cellY:  p.y,
+            radius: 7,
+            id:     i,
+          };
+        });
+      }
+
+      renderEconomyPanel(force === true);
+    }
+
+    if (liveSimCode) {
+      // If a sim was previously selected, surface the toggle hint without auto-enabling.
+      liveStatus.textContent = `上次 sim：${liveSimCode}（点 Live 启动）`;
+    }
     aiToggleButton.addEventListener("click", () => {
       vendingAgent.enabled = !vendingAgent.enabled;
       vendingAgent.state = vendingAgent.enabled ? "观测中" : "人工监控";

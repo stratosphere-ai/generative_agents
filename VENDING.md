@@ -63,6 +63,36 @@ bash scripts/e2e.sh                    # interactive: enter base_vending_min
   to use real `text-embedding-ada-002`. Vendy's 6 seed thoughts live at
   `personas/Vendy Unit-001/seed_thoughts.json`.
 
+## Live dashboard (index.html ↔ /api/vending)
+
+Repo-root `index.html` is a self-contained dashboard. It runs in two modes:
+
+- **Playground** (default): rule-based microsim, fully in-browser, persists to
+  `localStorage`. No backend required. Good for showing the economic model.
+- **Live**: dashboard pulls real data from a running Django sim via three
+  read-only endpoints. Click the `Live` button next to the economy toggle,
+  paste the `sim_code`, and it polls every 1.5s.
+
+Endpoints (all rooted under `environment/frontend_server/`):
+
+| URL                                       | Returns                                             |
+|-------------------------------------------|-----------------------------------------------------|
+| `/api/vending/state/<sim_code>/`          | `vending_state.json` + maze_name + curr_time        |
+| `/api/vending/journal/<sim_code>/?since=N`| Tail of `blockchain_journal.jsonl` from offset `N`  |
+| `/api/vending/personas/<sim_code>/`       | Latest `environment/<step>.json` + per-persona role |
+
+In Live mode `index.html` overrides:
+- `economy.stock` ← `vending_state.inventory`
+- `economy.prices` ← `vending_state.prices_cents / 100`
+- `economy.operatorCash` / `economy.revenue` ← `cash_balance_cents / 100`
+- `economy.health` ← `power_pct`
+- `vendingAgent.auditTrail` ← rebuilt from journal entries (kind →
+  status: `tx_*` → committed, `intent_fail` → failed, `intent_*` → queued)
+- `agents` ← persona positions, role-coloured
+
+The rule sim is paused in Live mode so it doesn't fight the backend feed.
+Toggling Live off restores the playground.
+
 ## Per-persona model routing
 
 `reverie/backend_server/vending/model_router.py` monkey-patches
