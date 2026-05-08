@@ -198,6 +198,50 @@ Wire it into the cognitive loop by:
 3. calling `log.begin_day(date_iso, cash, payable)` and `log.close_day(...)`
    at midnight; persisting via `log.save(persona._daily_report_path)`.
 
+## Action gate (SLA + governance)
+
+`vending/action_gate.py` is the single entry point any business decision
+should flow through. `gate_action(persona, action, payload, observation)`
+runs the SLA risk score, factors in price-governance violations for
+PRICE_CHANGE actions, and on a block:
+- increments `persona.sla_state.blocked`
+- publishes `{kind: "sla_blocked", action, risk, reasons}` so the daily
+  report listener counts it
+
+Two convenience commit helpers do gate + side-effect in one call:
+
+```python
+from vending.action_gate import commit_price_change, commit_restock
+import datetime as dt
+
+# Allowed → vending_state.prices_cents updated, governance recorded.
+res = commit_price_change(persona, sku="Coke", new_price_cents=158, now=dt.datetime.now())
+
+# Blocked oversized order; supplier ledger untouched, sla_blocked event emitted.
+res = commit_restock(persona, supplier_id="suntory",
+                     items=[("Coke", 200)], order_date=dt.date.today())
+```
+
+## Live dashboard endpoints
+
+Beyond `/state`, `/journal`, `/personas`, four endpoints surface the rest
+of Vendy's business state:
+
+| URL                                              | Returns |
+|--------------------------------------------------|---------|
+| `/api/vending/sla/<sim>/`                        | `sla_state.json` |
+| `/api/vending/governance/<sim>/`                 | `price_governance.json` |
+| `/api/vending/supplier/<sim>/`                   | contracts + invoices + history + payable_total + next_due |
+| `/api/vending/daily_report/<sim>/?limit=N`       | last_report + history (default 12, max 60) + today_start + cumulative |
+
+`index.html` Live mode now polls all six in parallel each tick and overlays:
+- `vendingAgent.sla` ← `/api/vending/sla`
+- `economy.supplierPayable` + `priceGovernance.lastAction` ← `/api/vending/supplier`
+- `economy.dailyReports` ← `/api/vending/daily_report`
+
+Sections are skipped silently when an endpoint 404s, so the dashboard still
+runs against earlier sims that don't have the new persistent state files.
+
 ## Per-persona model routing
 
 `reverie/backend_server/vending/model_router.py` monkey-patches

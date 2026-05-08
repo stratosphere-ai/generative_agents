@@ -78,6 +78,57 @@ def fake_sim(tmp_path, monkeypatch):
         "cash_balance_cents": 450,
         "power_pct": 87.5,
     }))
+    (sim_dir / "personas" / "Vendy Unit-001" / "bootstrap_memory" / "sla_state.json").write_text(json.dumps({
+        "enabled": True, "blocked": 3, "claims": 1, "risk_limit": 72,
+        "max_loan_cents": 14000, "max_order_cost_cents": 4800, "max_price_change": 0.45,
+    }))
+    (sim_dir / "personas" / "Vendy Unit-001" / "bootstrap_memory" / "price_governance.json").write_text(json.dumps({
+        "min_interval_hours": 12, "max_daily_changes": 1, "max_single_change_rate": 0.12,
+        "last_changed": {"Coke": "2026-04-28T08:00:00"},
+        "changes_today": {"Coke": 1},
+        "today_iso_date": "2026-04-28",
+        "last_action": "Coke 150 -> 158",
+    }))
+    (sim_dir / "personas" / "Vendy Unit-001" / "bootstrap_memory" / "supplier_ledger.json").write_text(json.dumps({
+        "_seq": 5,
+        "contracts": {"suntory": {
+            "supplier_id": "suntory", "label": "サントリー",
+            "cutoff_day": 31, "payment_offset_months": 1, "payment_day": 31,
+            "consumption_tax_rate": 0.08, "transfer_fee_cents_buyer": 220,
+            "early_payment_discount": 0.0, "sku_unit_costs_cents": {"Coke": 60},
+        }},
+        "open_orders": [],
+        "invoices": [{
+            "invoice_id": "INV-00001", "supplier_id": "suntory",
+            "cutoff_date": "2026-04-30", "due_date": "2026-05-31",
+            "lines": [{"sku": "Coke", "quantity": 24, "unit_cost_cents": 60}],
+            "subtotal_cents": 1440, "tax_cents": 115, "transfer_fee_cents": 220,
+            "total_cents": 1775, "paid": False, "paid_date": None,
+        }],
+        "history": [],
+    }))
+    (sim_dir / "personas" / "Vendy Unit-001" / "bootstrap_memory" / "daily_report.json").write_text(json.dumps({
+        "today_date_iso": None,
+        "today_start": None,
+        "cumulative": {"date_iso": "", "revenue_cents": 600, "cost_cents": 240,
+                        "sales_count": 5, "missed_count": 1,
+                        "cash_balance_cents": 0, "payable_cents": 0,
+                        "audit_count": 8, "sla_blocked": 1},
+        "weather_samples": [],
+        "weather_label_today": "晴", "season_label_today": "春", "holiday_label_today": "工作日",
+        "last_report": {
+            "date_iso": "2026-04-28",
+            "sales_count": 5, "revenue_cents": 600, "cost_cents": 240,
+            "profit_cents": 360, "missed_count": 1,
+            "weather_label": "晴", "season_label": "春", "holiday_label": "工作日",
+            "avg_traffic": 1.2, "peak_traffic": 1.6,
+            "sla_blocked": 1, "audit_count": 8, "payable_delta_cents": 0,
+            "next_due_date_iso": "2026-05-31",
+            "thought_text": "昨日 销售 5 单。",
+        },
+        "history": [],
+        "history_cap": 30,
+    }))
     (sim_dir / "personas" / "Vendy Unit-001" / "bootstrap_memory" / "scratch.json").write_text(json.dumps({
         "name": "Vendy Unit-001", "daily_plan_req": "operate as vendor"
     }))
@@ -143,3 +194,39 @@ def test_vending_personas_api_returns_positions_and_role(vending_views, fake_sim
     assert by_name["Marco Silva"]["x"]    == 25
     assert by_name["Marco Silva"]["role"] == "customer"
     assert by_name["Vendy Unit-001"]["x"] == 5
+
+
+def test_vending_sla_api_returns_state(vending_views, fake_sim):
+    resp = vending_views.vending_sla_api(_StubRequest(), fake_sim)
+    body = json.loads(resp.content)
+    assert body["sla_state"]["blocked"]    == 3
+    assert body["sla_state"]["risk_limit"] == 72
+    assert body["sla_state"]["__persona"]  == "Vendy Unit-001"
+
+
+def test_vending_governance_api_returns_state(vending_views, fake_sim):
+    resp = vending_views.vending_governance_api(_StubRequest(), fake_sim)
+    body = json.loads(resp.content)
+    assert body["price_governance"]["max_daily_changes"] == 1
+    assert body["price_governance"]["last_action"] == "Coke 150 -> 158"
+
+
+def test_vending_supplier_api_returns_payable_and_next_due(vending_views, fake_sim):
+    resp = vending_views.vending_supplier_api(_StubRequest(), fake_sim)
+    body = json.loads(resp.content)
+    assert body["payable_total_cents"] == 1775
+    assert body["next_due"]["due_date"] == "2026-05-31"
+    assert "suntory" in body["contracts"]
+
+
+def test_vending_daily_report_api_returns_last_report(vending_views, fake_sim):
+    resp = vending_views.vending_daily_report_api(_StubRequest(), fake_sim)
+    body = json.loads(resp.content)
+    assert body["last_report"]["sales_count"] == 5
+    assert body["last_report"]["profit_cents"] == 360
+    assert body["weather_today"]["weather"] == "晴"
+
+
+def test_vending_daily_report_api_404_on_unknown_sim(vending_views):
+    resp = vending_views.vending_daily_report_api(_StubRequest(), "no_such_sim_xyz")
+    assert resp.status_code == 404

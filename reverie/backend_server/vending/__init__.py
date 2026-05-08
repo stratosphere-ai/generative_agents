@@ -16,8 +16,10 @@ from .supplier import (
 )
 from .daily_report import DailyReportLog, DailyReport, DailySnapshot
 from .daily_report_listener import DailyReportListener
+from .action_gate import gate_action, commit_price_change, commit_restock
 
 __all__ = [
+    "gate_action", "commit_price_change", "commit_restock",
     "DailyReportListener",
     "bus", "VendingState", "CafeState", "SLAState", "Assessment", "PriceGovernance",
     "EnvironmentCycle", "EnvironmentSnapshot", "Weather", "Season",
