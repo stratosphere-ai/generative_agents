@@ -97,6 +97,60 @@ def vending_journal_api(request, sim_code: str):
     })
 
 
+def vending_reconcile_api(request, sim_code: str):
+    """Offline drift summary: count of un-acked intents in the journal.
+
+    Mirrors `scripts/reconcile.py --mode summary` so the dashboard can flag
+    drift without exposing chain-side queries.
+    """
+    sim_dir = _safe_sim(sim_code)
+    if sim_dir is None:
+        return JsonResponse({"error": "sim not found"}, status=404)
+
+    journal_path = os.path.join(sim_dir, "blockchain_journal.jsonl")
+    by_local: dict = {}
+    if os.path.exists(journal_path):
+        with open(journal_path) as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rec = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                uuid = rec.get("local_uuid")
+                if not uuid:
+                    continue
+                slot = by_local.setdefault(uuid, {
+                    "intent_start": False, "tx_start": None,
+                    "intent_complete": False, "tx_complete": None,
+                    "intent_fail": False, "tx_fail": None,
+                })
+                kind = rec.get("kind")
+                if   kind == "intent_start":    slot["intent_start"]    = True
+                elif kind == "tx_start":        slot["tx_start"]        = rec.get("tx_hash")
+                elif kind == "intent_complete": slot["intent_complete"] = True
+                elif kind == "tx_complete":     slot["tx_complete"]     = rec.get("tx_hash")
+                elif kind == "intent_fail":     slot["intent_fail"]     = True
+                elif kind == "tx_fail":         slot["tx_fail"]         = rec.get("tx_hash")
+
+    unsubmitted = [u for u, s in by_local.items() if s["intent_start"] and not s["tx_start"]]
+    pending_c   = [u for u, s in by_local.items() if s["intent_complete"] and not s["tx_complete"]]
+    pending_f   = [u for u, s in by_local.items() if s["intent_fail"]     and not s["tx_fail"]]
+    total_drift = len(unsubmitted) + len(pending_c) + len(pending_f)
+
+    return JsonResponse({
+        "sim_code":             sim_code,
+        "total_local_uuids":    len(by_local),
+        "unsubmitted_intents":  sorted(unsubmitted)[:10],
+        "pending_completes":    sorted(pending_c)[:10],
+        "pending_fails":        sorted(pending_f)[:10],
+        "drift_count":          total_drift,
+        "has_drift":            total_drift > 0,
+    })
+
+
 def _read_persona_json(sim_dir: str, filename: str) -> dict | None:
     """Read a JSON file from the vending persona's bootstrap_memory dir, if present."""
     personas_dir = os.path.join(sim_dir, "personas")

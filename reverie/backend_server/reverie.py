@@ -42,6 +42,7 @@ from vending.price_governance import PriceGovernance
 from vending.supplier import SupplierLedger
 from vending.daily_report import DailyReportLog
 from vending.daily_report_listener import DailyReportListener
+from vending.llm_action_loop import request_business_action as _request_business_action
 from vending.environment_cycle import from_env as _build_env_cycle
 from vending.prompt_inject import attach_to_persona as _attach_vending_prompt
 from vending.model_router import install as _install_model_router, with_persona as _with_persona
@@ -220,6 +221,22 @@ class ReverieServer:
           listener = DailyReportListener(persona)
           listener.attach()
           self._daily_report_listeners.append(listener)
+
+      # On every hourly_start for a vending persona, fire the LLM action loop.
+      # Disabled when LLM_ACTION_LOOP=off so dry runs / tests stay free of
+      # API calls. Errors are swallowed by request_business_action itself.
+      _action_loop_enabled = os.environ.get("LLM_ACTION_LOOP", "on").lower() != "off"
+      if _action_loop_enabled:
+        _personas = self.personas
+        def _on_hourly_start(event):
+          name = event.get("kind") == "hourly_start" and event.get("persona")
+          if not name:
+            return
+          persona = _personas.get(name)
+          if persona is None or not getattr(persona, "vending_state", None):
+            return
+          _request_business_action(persona, now=persona.scratch.curr_time)
+        _vending_bus.subscribe(_on_hourly_start)
 
 
   def save(self):

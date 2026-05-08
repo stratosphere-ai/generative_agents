@@ -242,6 +242,22 @@ of Vendy's business state:
 Sections are skipped silently when an endpoint 404s, so the dashboard still
 runs against earlier sims that don't have the new persistent state files.
 
+## Forge test
+
+Run on a host with network access (the in-IDE sandbox blocks the
+foundry installer):
+
+```bash
+bash scripts/forge_test.sh
+```
+
+The script idempotently installs foundryup, runs `foundryup` to fetch
+forge/cast/anvil, ensures `forge-std` is in `contracts/lib/`, then runs
+`forge build` and `forge test -vv`. The 7 cases in
+`contracts/test/TaskRegistry.t.sol` cover monotonic id allocation,
+parent-child wiring, agent ownership, status transitions, and the
+revert paths for unknown parents / unknown ids / unauthorized callers.
+
 ## LLM action parser & dispatch
 
 `vending/action_parser.py` is the bridge between Vendy's LLM output and
@@ -275,6 +291,35 @@ assess, applied, summary = dispatch(vendy, llm_output, now=dt.datetime.now())
 Successful commits also publish `business_action_committed` so the
 TaskRegistry adapter writes one ACTION row on chain (under the current
 HOURLY parent).
+
+## Hourly LLM action loop
+
+`vending/llm_action_loop.py` glues the LLM into the action gate. On every
+`hourly_start` event for Vendy, `reverie.py` calls
+`request_business_action(persona, now)` which:
+
+1. Builds a prompt from `prompt_inject.state_preamble` (so the model sees
+   business state + SLA + governance + environment + supplier + yesterday's
+   report — all six sections).
+2. Adds a hard schema instruction asking for one JSON action object,
+   `NO_OP`-or-not.
+3. Calls `openai.ChatCompletion.create` inside `with_persona(persona)` so
+   model-router routes Vendy to `MODEL_VENDY` (default `gpt-4o`).
+4. Parses + dispatches via `action_parser.dispatch`, which runs the action
+   through the SLA gate (and price-governance for PRICE_CHANGE) and either
+   commits + writes to chain or emits `sla_blocked`.
+5. Appends the summary line to `persona.memory` so the next plan prompt
+   sees the audit trail.
+
+OpenAI failures (timeout, parse error, missing key) fall through to
+`ActionResult(applied=False, summary="error: ...")` so the sim never
+crashes.
+
+Disable for dry runs:
+
+```bash
+export LLM_ACTION_LOOP=off
+```
 
 ## Reconciliation tool
 

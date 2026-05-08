@@ -230,3 +230,32 @@ def test_vending_daily_report_api_returns_last_report(vending_views, fake_sim):
 def test_vending_daily_report_api_404_on_unknown_sim(vending_views):
     resp = vending_views.vending_daily_report_api(_StubRequest(), "no_such_sim_xyz")
     assert resp.status_code == 404
+
+
+def test_vending_reconcile_api_summarizes_drift(vending_views, fake_sim):
+    # The fake_sim journal has 1 clean intent (u1) only; no drift.
+    resp = vending_views.vending_reconcile_api(_StubRequest(), fake_sim)
+    body = json.loads(resp.content)
+    assert body["total_local_uuids"] == 1
+    assert body["drift_count"]       == 0
+    assert body["has_drift"]         is False
+
+
+def test_vending_reconcile_api_flags_pending_intents(vending_views, fake_sim, tmp_path):
+    # Append two stuck intents to the existing journal (lead with \n in case
+    # the original write didn't terminate the last line).
+    journal = FRONTEND / "storage" / fake_sim / "blockchain_journal.jsonl"
+    with journal.open("a") as f:
+        f.write("\n" + json.dumps({"ts": 9, "kind": "intent_start", "local_uuid": "stuck1",
+                            "description": "stuck", "task_type": "ACTION"}) + "\n")
+        f.write(json.dumps({"ts": 10, "kind": "intent_start", "local_uuid": "stuck2",
+                            "description": "also stuck", "task_type": "ACTION"}) + "\n")
+        f.write(json.dumps({"ts": 11, "kind": "tx_start", "local_uuid": "stuck2",
+                            "on_chain_id": 5, "tx_hash": "0xfff"}) + "\n")
+
+    resp = vending_views.vending_reconcile_api(_StubRequest(), fake_sim)
+    body = json.loads(resp.content)
+    assert body["has_drift"]    is True
+    assert body["drift_count"]  == 1                # only stuck1 has no tx_start
+    assert "stuck1" in body["unsubmitted_intents"]
+    assert "stuck2" not in body["unsubmitted_intents"]

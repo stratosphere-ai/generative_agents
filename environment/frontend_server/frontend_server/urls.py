@@ -39,5 +39,6 @@ urlpatterns = [
     url(r'^api/vending/governance/(?P<sim_code>[\w\-.]+)/$',   vending_api.vending_governance_api,   name='vending_governance_api'),
     url(r'^api/vending/supplier/(?P<sim_code>[\w\-.]+)/$',     vending_api.vending_supplier_api,     name='vending_supplier_api'),
     url(r'^api/vending/daily_report/(?P<sim_code>[\w\-.]+)/$', vending_api.vending_daily_report_api, name='vending_daily_report_api'),
+    url(r'^api/vending/reconcile/(?P<sim_code>[\w\-.]+)/$',    vending_api.vending_reconcile_api,    name='vending_reconcile_api'),
     path('admin/', admin.site.urls),
 ]

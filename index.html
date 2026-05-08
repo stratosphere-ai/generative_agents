@@ -844,6 +844,12 @@
   <main class="app">
     <header class="topbar">
       <h1>城市微观公园沙盒</h1>
+      <div class="drift-banner" id="driftBanner" role="status"
+           style="display:none;padding:4px 10px;border-radius:6px;
+                  background:rgba(196, 77, 49, 0.12);color:#8a3a24;
+                  font-size:0.82rem;border:1px solid rgba(196, 77, 49, 0.45);
+                  white-space:nowrap;cursor:default;"
+           title="链上链下账目存在 drift；运行 scripts/reconcile.py 查看详情"></div>
       <div class="meta" id="summary">38 x 24</div>
     </header>
 
@@ -1040,6 +1046,7 @@
     const supplierInvoicesList = document.querySelector("#supplierInvoicesList");
     const dailyKpiChips        = document.querySelector("#dailyKpiChips");
     const dailyProfitSparkline = document.querySelector("#dailyProfitSparkline");
+    const driftBanner          = document.querySelector("#driftBanner");
     const liveModeToggle = document.querySelector("#liveModeToggle");
     const liveConfig     = document.querySelector("#liveConfig");
     const liveSimInput   = document.querySelector("#liveSimInput");
@@ -3390,6 +3397,7 @@
         liveTick(true);
       } else {
         if (liveTimerId) { clearInterval(liveTimerId); liveTimerId = null; }
+        clearDriftBanner();
         economy.lastEvent = "回到 Playground，规则模拟继续。";
         economyRunning = true;
         economyToggle.textContent = "暂停";
@@ -3411,13 +3419,14 @@
       }
       try {
         const sim = encodeURIComponent(liveSimCode);
-        const [stateRes, journalRes, personasRes, slaRes, supplierRes, reportRes] = await Promise.all([
+        const [stateRes, journalRes, personasRes, slaRes, supplierRes, reportRes, reconcileRes] = await Promise.all([
           fetch(`${liveApiBase}/api/vending/state/${sim}/`),
           fetch(`${liveApiBase}/api/vending/journal/${sim}/?since=${liveJournalSeen}`),
           fetch(`${liveApiBase}/api/vending/personas/${sim}/`),
           fetch(`${liveApiBase}/api/vending/sla/${sim}/`),
           fetch(`${liveApiBase}/api/vending/supplier/${sim}/`),
-          fetch(`${liveApiBase}/api/vending/daily_report/${sim}/?limit=8`)
+          fetch(`${liveApiBase}/api/vending/daily_report/${sim}/?limit=8`),
+          fetch(`${liveApiBase}/api/vending/reconcile/${sim}/`)
         ]);
         if (!stateRes.ok) {
           liveStatus.textContent = `state ${stateRes.status}`;
@@ -3426,10 +3435,12 @@
         const state    = await stateRes.json();
         const journal  = journalRes.ok  ? await journalRes.json()  : { entries: [], count: 0 };
         const personas = personasRes.ok ? await personasRes.json() : { personas: [] };
-        const sla      = slaRes.ok      ? await slaRes.json()      : null;
-        const supplier = supplierRes.ok ? await supplierRes.json() : null;
-        const report   = reportRes.ok   ? await reportRes.json()   : null;
+        const sla       = slaRes.ok       ? await slaRes.json()       : null;
+        const supplier  = supplierRes.ok  ? await supplierRes.json()  : null;
+        const report    = reportRes.ok    ? await reportRes.json()    : null;
+        const reconcile = reconcileRes.ok ? await reconcileRes.json() : null;
         applyLiveState(state, journal, personas, force, sla, supplier, report);
+        renderDriftBanner(reconcile);
         liveStatus.textContent = `${state.curr_time || ""}  step ${state.step ?? "?"}  +${journal.count} 条`;
       } catch (err) {
         liveStatus.textContent = `离线：${err.message || err}`;
@@ -3543,6 +3554,27 @@
 
       renderEconomyPanel(force === true);
     }
+
+    function renderDriftBanner(body) {
+      if (!driftBanner) return;
+      if (!body) {
+        driftBanner.style.display = "none";
+        return;
+      }
+      if (!body.has_drift) {
+        driftBanner.style.display = "none";
+        return;
+      }
+      const parts = [];
+      if (body.unsubmitted_intents?.length) parts.push(`${body.unsubmitted_intents.length} 未提交`);
+      if (body.pending_completes?.length)   parts.push(`${body.pending_completes.length} 待完成`);
+      if (body.pending_fails?.length)       parts.push(`${body.pending_fails.length} 待失败回执`);
+      driftBanner.textContent = `链上 drift × ${body.drift_count}（${parts.join("，")}）— 跑 reconcile.py`;
+      driftBanner.style.display = "inline-block";
+    }
+
+    // Off-mode: hide the drift banner so the playground UI stays clean.
+    function clearDriftBanner() { if (driftBanner) driftBanner.style.display = "none"; }
 
     function renderSupplierPanel(body) {
       if (!supplierPayableValue) return;
