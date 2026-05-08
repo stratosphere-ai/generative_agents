@@ -242,6 +242,61 @@ of Vendy's business state:
 Sections are skipped silently when an endpoint 404s, so the dashboard still
 runs against earlier sims that don't have the new persistent state files.
 
+## TaskRegistry V2 (atomic action + batch)
+
+`contracts/src/TaskRegistryV2.sol` ships a backwards-compatible upgrade of
+the V1 contract. V1's `startTask` / `completeTask` / `failTask` /
+`cancelTask` / `getTask` are preserved with identical signatures, plus
+four new entry points:
+
+| New function | Purpose |
+|---|---|
+| `startTaskBatch(StartArgs[])`         | One tx, N starts. Atomic-revert on any single failure. |
+| `completeTaskBatch(CompleteArgs[])`   | One tx, N completes. |
+| `recordAtomicAction(...)`             | Start AND complete in one tx; emits a single `AtomicActionRecorded` event. |
+| `recordAtomicActionBatch(StartArgs[], bytes32[])` | One tx, N atomic actions. |
+
+The Python client gains matching surface:
+- `MockTaskRegistryClient.record_atomic_action` / `start_task_batch` / `complete_task_batch`
+- `TaskRegistryClient.record_atomic_action` / `start_task_batch` / `complete_task_batch` —
+  enqueue new `("atomic" | "start_batch" | "complete_batch", ...)` items;
+  the worker decodes batched receipts (multiple TaskStarted / one
+  AtomicActionRecorded) and updates the local→on-chain id map.
+
+`TaskRegistryAdapter` now uses `record_atomic_action` automatically for
+`transaction_completed` and `business_action_committed` events (atomic
+sub-actions nested under the current HOURLY parent). It falls back to the
+old start-then-complete pair when the client lacks the V2 method, so old
+mocks and V1 deployments still work.
+
+### Deploying V2 vs V1
+
+```bash
+# default: V2
+bash scripts/deploy_local.sh
+
+# explicit V1 (e.g. comparison runs)
+bash scripts/deploy_local.sh --v1
+```
+
+`.env.local` records `CONTRACT_VERSION=v2|v1`. Forge tests cover both
+contracts (`contracts/test/TaskRegistry.t.sol` for V1, V2 adds 8 cases
+in `contracts/test/TaskRegistryV2.t.sol`: monotonic batch ids, atomic
+revert on unknown parent, completeBatch flips status, recordAtomicAction
+end-state, atomic batch parallel + length-mismatch reject, plus 3 V1
+back-compat assertions).
+
+### Gas / latency expectations (sim 1 day, ~200 tasks)
+
+| Surface | tx count | total gas (rough) | wall clock @ 2s/tx |
+|---|--:|--:|--:|
+| V1 only | ~200 | ~30M | ~7 min |
+| V2 (atomic for ACTION children) | ~110 | ~20M | ~4 min |
+| V2 + opportunistic batches      | ~50  | ~12M | ~100 s |
+
+The current adapter only uses V2's atomic shortcut; opportunistic batching
+of clustered HOURLY events is a follow-up if RPC-side cost matters.
+
 ## Forge test
 
 Run on a host with network access (the in-IDE sandbox blocks the

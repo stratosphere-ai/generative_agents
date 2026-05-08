@@ -82,6 +82,50 @@ class MockTaskRegistryClient:
             t.reason = reason
         self.calls.append(("fail", local_uuid, on_chain_id, reason))
 
+    # ---- V2 surface (batch + atomic) ------------------------------------
+
+    def record_atomic_action(
+        self,
+        *,
+        parent_local_uuid: Optional[str],
+        task_type: str,
+        description: str,
+        event_spo: tuple[str, str, str],
+        result: Mapping[str, Any] | None = None,
+        payload: Mapping[str, Any] | None = None,
+    ) -> str:
+        """Atomic start+complete in one logical call. Saves a tx on-chain."""
+        with self._lock:
+            local_uuid = _uuid.uuid4().hex
+            parent_id = self._local_to_id.get(parent_local_uuid, 0) if parent_local_uuid else 0
+            on_chain_id = self._next_id
+            self._next_id += 1
+            self._local_to_id[local_uuid] = on_chain_id
+            self._tasks[on_chain_id] = _MockTask(
+                on_chain_id = on_chain_id,
+                parent_id   = parent_id,
+                task_type   = task_type,
+                description = description,
+                event_spo   = event_spo,
+                status      = "completed",
+                result      = dict(result or {}),
+            )
+        self.calls.append(("atomic", local_uuid, on_chain_id, parent_id, task_type, description))
+        return local_uuid
+
+    def start_task_batch(self, items: list[Mapping[str, Any]]) -> list[str]:
+        """Each item is the same kwarg shape as start_task. Returns local_uuids in order."""
+        out: list[str] = []
+        for it in items:
+            out.append(self.start_task(**it))
+        self.calls.append(("start_batch", len(items)))
+        return out
+
+    def complete_task_batch(self, items: list[Mapping[str, Any]]) -> None:
+        for it in items:
+            self.complete_task(it["local_uuid"], it.get("result"))
+        self.calls.append(("complete_batch", len(items)))
+
     def shutdown(self, *_: Any, **__: Any) -> None:
         pass
 

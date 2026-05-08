@@ -88,10 +88,19 @@ class TaskRegistryAdapter:
         if local is not None:
             self.client.complete_task(local, {"completed_at": e.get("completed_at")})
 
+    def _atomic_or_pair(self, **kwargs: Any) -> str:
+        """Use V2's atomic action when the client supports it; fall back to start+complete."""
+        if hasattr(self.client, "record_atomic_action"):
+            return self.client.record_atomic_action(**kwargs)
+        result = kwargs.pop("result", None)
+        local = self.client.start_task(**kwargs)
+        self.client.complete_task(local, result or {})
+        return local
+
     def _on_transaction_completed(self, e: Mapping[str, Any]) -> None:
         # Transactions are atomic ACTIONs nested under the current hourly plan.
         desc = f"sold {e['sku']} to {e['customer']} for ${e['price_cents'] / 100:.2f}"
-        local = self.client.start_task(
+        self._atomic_or_pair(
             parent_local_uuid = self.current_hourly_local_uuid,
             task_type         = "ACTION",
             description       = desc,
@@ -102,17 +111,17 @@ class TaskRegistryAdapter:
                 "price_cents": e["price_cents"],
                 "timestamp":   e["timestamp"],
             },
+            result            = {"timestamp": e["timestamp"]},
         )
-        self.client.complete_task(local, {"timestamp": e["timestamp"]})
 
     def _on_business_action_committed(self, e: Mapping[str, Any]) -> None:
         # Business decisions (price changes, restocks, ...) are atomic ACTIONs
         # nested under the current hourly plan.
-        local = self.client.start_task(
+        self._atomic_or_pair(
             parent_local_uuid = self.current_hourly_local_uuid,
             task_type         = "ACTION",
             description       = e["description"],
             event_spo         = tuple(e.get("event_spo") or (VENDY, "did", e.get("action") or "action")),
             payload           = e.get("payload") or {},
+            result            = {"timestamp": e.get("timestamp")},
         )
-        self.client.complete_task(local, {"timestamp": e.get("timestamp")})
