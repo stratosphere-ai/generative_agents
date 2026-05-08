@@ -97,6 +97,94 @@ def vending_journal_api(request, sim_code: str):
     })
 
 
+def vending_dispatch_api(request, sim_code: str):
+    """Dry-run: parse an LLM action and report what the gate would do.
+
+    Accepts a POST body shaped either as `{"text": "<llm output>"}` or
+    `{"action": "PRICE_CHANGE", ...}`. Loads the persona's sla_state.json
+    + price_governance.json + supplier_ledger.json + vending_state.json
+    from disk, runs the assessment, and returns the would-be result. Does
+    NOT mutate any state — apply still requires the live sim's LLM loop.
+    """
+    if request.method != "POST":
+        return JsonResponse({"error": "POST required"}, status=405)
+
+    sim_dir = _safe_sim(sim_code)
+    if sim_dir is None:
+        return JsonResponse({"error": "sim not found"}, status=404)
+
+    try:
+        body = json.loads(request.body.decode("utf-8") or "{}")
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        return JsonResponse({"error": f"invalid JSON body: {exc}"}, status=400)
+    if not isinstance(body, dict):
+        return JsonResponse({"error": "body must be a JSON object"}, status=400)
+
+    # Path imports are relative to backend; vendor in the dispatch helpers.
+    import sys
+    backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__),
+                                               "..", "..", "..", "reverie", "backend_server"))
+    if backend_dir not in sys.path:
+        sys.path.insert(0, backend_dir)
+    try:
+        from vending.action_parser import parse_action
+        from vending.sla import SLAState
+        from vending.price_governance import PriceGovernance
+    except Exception as exc:                                    # noqa: BLE001
+        return JsonResponse({"error": f"backend modules unavailable: {exc}"}, status=500)
+
+    text = body.get("text")
+    parsed = parse_action(text) if text else parse_action(body)
+    if parsed is None:
+        return JsonResponse({"sim_code": sim_code,
+                             "parsed":   None,
+                             "summary":  "no actionable JSON parsed"})
+
+    state_data = _read_persona_json(sim_dir, "vending_state.json")    or {}
+    sla_data   = _read_persona_json(sim_dir, "sla_state.json")        or {}
+    gov_data   = _read_persona_json(sim_dir, "price_governance.json") or {}
+
+    sla = SLAState(**{k: v for k, v in sla_data.items() if k in SLAState.__dataclass_fields__})
+    gov = PriceGovernance(**{k: v for k, v in gov_data.items() if k in PriceGovernance.__dataclass_fields__})
+
+    # Augment payload with on-disk context that gate_action would normally derive.
+    payload  = dict(parsed.payload)
+    gov_reasons: list[str] = []
+    if parsed.action == "PRICE_CHANGE":
+        sku = payload.get("sku")
+        next_cents = int(payload.get("next_price_cents", 0))
+        prev_cents = int((state_data.get("prices_cents") or {}).get(sku, 0))
+        payload["previous_price_cents"] = prev_cents
+        if sku is not None:
+            import datetime as _dt
+            ok, gov_reasons = gov.can_change_price(sku, prev_cents, next_cents, _dt.datetime.now())
+            payload["price_locked"]            = any("观察窗口" in r for r in gov_reasons)
+            payload["daily_changes_exhausted"] = any("调价次数已用尽" in r for r in gov_reasons)
+
+    assessment = sla.assess(parsed.action, payload, observation={
+        "cash_balance_cents":  int(state_data.get("cash_balance_cents", 0)),
+        "stock_at_risk":       [sku for sku, qty in (state_data.get("inventory") or {}).items() if int(qty) <= 3],
+    })
+    return JsonResponse({
+        "sim_code":   sim_code,
+        "parsed":     {"action": parsed.action, "payload": payload},
+        "assessment": {
+            "allowed": assessment.allowed,
+            "risk":    assessment.risk,
+            "reasons": list(assessment.reasons),
+        },
+        "governance_reasons": gov_reasons,
+        "summary": (
+            f"{parsed.action}: "
+            f"{'WOULD COMMIT' if assessment.allowed else 'WOULD BLOCK'} "
+            f"(risk={assessment.risk})"
+            + (f" — {'，'.join(assessment.reasons)}" if assessment.reasons else "")
+        ),
+        "applied":  False,
+        "dry_run":  True,
+    })
+
+
 def vending_reconcile_api(request, sim_code: str):
     """Offline drift summary: count of un-acked intents in the journal.
 

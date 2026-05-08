@@ -241,6 +241,53 @@ def test_vending_reconcile_api_summarizes_drift(vending_views, fake_sim):
     assert body["has_drift"]         is False
 
 
+class _StubPostRequest(_StubRequest):
+    def __init__(self, body, **query):
+        super().__init__(method="POST", **query)
+        self.body = body if isinstance(body, bytes) else body.encode("utf-8")
+
+
+def test_dispatch_api_dry_runs_price_change_within_caps(vending_views, fake_sim):
+    body = json.dumps({
+        "text": '{"action":"PRICE_CHANGE","sku":"Coke","next_price_cents":158}'
+    })
+    resp = vending_views.vending_dispatch_api(_StubPostRequest(body), fake_sim)
+    out = json.loads(resp.content)
+    assert out["dry_run"] is True
+    assert out["applied"] is False
+    assert out["parsed"]["action"] == "PRICE_CHANGE"
+    assert out["assessment"]["allowed"] is True
+    assert "WOULD COMMIT" in out["summary"]
+
+
+def test_dispatch_api_blocks_oversized_jump(vending_views, fake_sim):
+    body = json.dumps({
+        "text": '{"action":"PRICE_CHANGE","sku":"Coke","next_price_cents":300}'
+    })
+    resp = vending_views.vending_dispatch_api(_StubPostRequest(body), fake_sim)
+    out = json.loads(resp.content)
+    assert out["assessment"]["allowed"] is False
+    assert "WOULD BLOCK" in out["summary"]
+
+
+def test_dispatch_api_handles_no_actionable_input(vending_views, fake_sim):
+    body = json.dumps({"text": "just thinking out loud"})
+    resp = vending_views.vending_dispatch_api(_StubPostRequest(body), fake_sim)
+    out = json.loads(resp.content)
+    assert out["parsed"] is None
+    assert "no actionable" in out["summary"]
+
+
+def test_dispatch_api_rejects_non_post(vending_views, fake_sim):
+    resp = vending_views.vending_dispatch_api(_StubRequest(), fake_sim)
+    assert resp.status_code == 405
+
+
+def test_dispatch_api_rejects_invalid_json_body(vending_views, fake_sim):
+    resp = vending_views.vending_dispatch_api(_StubPostRequest("not json"), fake_sim)
+    assert resp.status_code == 400
+
+
 def test_vending_reconcile_api_flags_pending_intents(vending_views, fake_sim, tmp_path):
     # Append two stuck intents to the existing journal (lead with \n in case
     # the original write didn't terminate the last line).

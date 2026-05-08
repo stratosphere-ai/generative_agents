@@ -22,6 +22,7 @@ class VendingState:
     power_pct: float                       = 100.0
     last_restock_iso: str | None           = None
     wallet_address: str | None             = None
+    outstanding_loans_cents: int           = 0    # current debt to the bank (¥)
 
     @classmethod
     def load(cls, path: Path) -> "VendingState":
@@ -29,12 +30,13 @@ class VendingState:
             return cls()
         data: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
         return cls(
-            inventory          = dict(data.get("inventory", {})),
-            prices_cents       = dict(data.get("prices_cents", {})),
-            cash_balance_cents = int(data.get("cash_balance_cents", 0)),
-            power_pct          = float(data.get("power_pct", 100.0)),
-            last_restock_iso   = data.get("last_restock_iso"),
-            wallet_address     = data.get("wallet_address"),
+            inventory               = dict(data.get("inventory", {})),
+            prices_cents            = dict(data.get("prices_cents", {})),
+            cash_balance_cents      = int(data.get("cash_balance_cents", 0)),
+            power_pct               = float(data.get("power_pct", 100.0)),
+            last_restock_iso        = data.get("last_restock_iso"),
+            wallet_address          = data.get("wallet_address"),
+            outstanding_loans_cents = int(data.get("outstanding_loans_cents", 0)),
         )
 
     def save(self, path: Path) -> None:

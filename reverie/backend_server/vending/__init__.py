@@ -19,11 +19,13 @@ from .daily_report_listener import DailyReportListener
 from .action_gate import gate_action, commit_price_change, commit_restock
 from .action_parser import parse_action, dispatch, ParsedAction
 from .llm_action_loop import request_business_action, ActionResult
+from .auto_loan import request_loan_for_shortfall, LoanResult
 
 __all__ = [
     "gate_action", "commit_price_change", "commit_restock",
     "parse_action", "dispatch", "ParsedAction",
     "request_business_action", "ActionResult",
+    "request_loan_for_shortfall", "LoanResult",
     "DailyReportListener",
     "bus", "VendingState", "CafeState", "SLAState", "Assessment", "PriceGovernance",
     "EnvironmentCycle", "EnvironmentSnapshot", "Weather", "Season",

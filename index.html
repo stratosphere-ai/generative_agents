@@ -970,6 +970,20 @@
               </div>
               <div class="audit-list" id="auditTrailList"></div>
             </div>
+            <div class="reasoning-window" aria-label="LLM dispatch 试运行">
+              <div class="reasoning-head">
+                <span>Dispatch 试运行</span>
+                <strong id="dispatchStatus">需 Live 模式</strong>
+              </div>
+              <textarea id="dispatchInput" placeholder='{"action":"PRICE_CHANGE","sku":"Coke","next_price_cents":158}'
+                        style="width:100%;min-height:54px;font-family:ui-monospace,Menlo,monospace;font-size:0.78rem;
+                               border:1px solid var(--line);border-radius:6px;padding:6px;margin-top:4px;resize:vertical;"></textarea>
+              <div style="display:flex;gap:6px;margin-top:6px;">
+                <button class="action mini" id="dispatchRunButton" type="button">试运行</button>
+                <span id="dispatchSummary" style="font-size:0.82rem;color:var(--muted);align-self:center;flex:1;"></span>
+              </div>
+              <div id="dispatchDetails" style="font-size:0.78rem;margin-top:6px;color:var(--muted);"></div>
+            </div>
             <div class="reasoning-window" aria-label="供货商账款">
               <div class="reasoning-head">
                 <span>供货商 / 買掛金</span>
@@ -1047,6 +1061,11 @@
     const dailyKpiChips        = document.querySelector("#dailyKpiChips");
     const dailyProfitSparkline = document.querySelector("#dailyProfitSparkline");
     const driftBanner          = document.querySelector("#driftBanner");
+    const dispatchInput        = document.querySelector("#dispatchInput");
+    const dispatchRunButton    = document.querySelector("#dispatchRunButton");
+    const dispatchStatus       = document.querySelector("#dispatchStatus");
+    const dispatchSummary      = document.querySelector("#dispatchSummary");
+    const dispatchDetails      = document.querySelector("#dispatchDetails");
     const liveModeToggle = document.querySelector("#liveModeToggle");
     const liveConfig     = document.querySelector("#liveConfig");
     const liveSimInput   = document.querySelector("#liveSimInput");
@@ -3660,6 +3679,41 @@
       // If a sim was previously selected, surface the toggle hint without auto-enabling.
       liveStatus.textContent = `上次 sim：${liveSimCode}（点 Live 启动）`;
     }
+
+    async function runDispatchDryRun() {
+      if (!liveSimCode) {
+        dispatchStatus.textContent = "请先在 Live 配置里填 sim_code";
+        return;
+      }
+      const text = (dispatchInput.value || "").trim();
+      if (!text) {
+        dispatchStatus.textContent = "请输入 LLM JSON / 文本";
+        return;
+      }
+      dispatchStatus.textContent = "请求中…";
+      try {
+        const resp = await fetch(`${liveApiBase}/api/vending/dispatch/${encodeURIComponent(liveSimCode)}/`, {
+          method:  "POST",
+          headers: {"content-type": "application/json"},
+          body:    JSON.stringify({text: text}),
+        });
+        if (!resp.ok) {
+          dispatchStatus.textContent = `HTTP ${resp.status}`;
+          return;
+        }
+        const out = await resp.json();
+        dispatchStatus.textContent = out.dry_run ? "dry-run" : "applied";
+        dispatchSummary.textContent = out.summary || "";
+        const reasons = (out.assessment?.reasons || []).concat(out.governance_reasons || []);
+        dispatchDetails.innerHTML = reasons.length
+          ? `<strong>原因</strong>：${reasons.map((r) => `<span style="display:inline-block;background:rgba(196,77,49,0.10);
+                color:#8a3a24;padding:2px 6px;border-radius:99px;margin:2px 4px 0 0;">${r}</span>`).join("")}`
+          : `<span style="color:var(--accent);">通过；解析 ${JSON.stringify(out.parsed?.action || "—")}</span>`;
+      } catch (err) {
+        dispatchStatus.textContent = `错误：${err.message || err}`;
+      }
+    }
+    dispatchRunButton.addEventListener("click", runDispatchDryRun);
     aiToggleButton.addEventListener("click", () => {
       vendingAgent.enabled = !vendingAgent.enabled;
       vendingAgent.state = vendingAgent.enabled ? "观测中" : "人工监控";

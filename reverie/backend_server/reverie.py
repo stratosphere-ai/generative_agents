@@ -43,6 +43,8 @@ from vending.supplier import SupplierLedger
 from vending.daily_report import DailyReportLog
 from vending.daily_report_listener import DailyReportListener
 from vending.llm_action_loop import request_business_action as _request_business_action
+from vending.auto_loan import request_loan_for_shortfall as _request_loan_for_shortfall
+from vending.supplier import InsufficientFundsError as _InsufficientFundsError
 from vending.environment_cycle import from_env as _build_env_cycle
 from vending.prompt_inject import attach_to_persona as _attach_vending_prompt
 from vending.model_router import install as _install_model_router, with_persona as _with_persona
@@ -510,10 +512,21 @@ class ReverieServer:
                 # Run supplier cutoff/payment events at midnight so AP rolls.
                 ledger = getattr(persona, "supplier_ledger", None)
                 if ledger is not None and self.curr_time.hour == 0 and self.curr_time.minute == 0 and self.curr_time.second < self.sec_per_step:
+                  vs = persona.vending_state
                   try:
-                    ledger.tick(self.curr_time.date(), cash_balance_cents=persona.vending_state.cash_balance_cents)
+                    ledger.tick(self.curr_time.date(), cash_balance_cents=vs.cash_balance_cents)
+                  except _InsufficientFundsError as exc:
+                    # Try to bridge with a SLA-bounded auto-loan, then retry once.
+                    loan = _request_loan_for_shortfall(
+                      persona, exc.shortfall_cents, now=self.curr_time,
+                      reason=f"settle invoice {exc.invoice_id}",
+                    )
+                    if loan.granted_cents > 0:
+                      try:
+                        ledger.tick(self.curr_time.date(), cash_balance_cents=vs.cash_balance_cents)
+                      except _InsufficientFundsError:
+                        pass   # loan still wasn't enough; defer to ops
                   except Exception:                            # noqa: BLE001
-                    # Insufficient funds or similar — surfaced via journal/log.
                     pass
 
           int_counter -= 1

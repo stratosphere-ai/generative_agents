@@ -321,6 +321,52 @@ Disable for dry runs:
 export LLM_ACTION_LOOP=off
 ```
 
+## Auto-loan on supplier shortfall
+
+When `supplier_ledger.tick(today)` raises `InsufficientFundsError` on a
+支払日, `reverie.py` automatically calls
+`auto_loan.request_loan_for_shortfall(persona, shortfall, now)` which:
+
+1. Computes desired loan = shortfall + 10% buffer, rounded up to the
+   nearest ¥100 (banks issue in ¥100 increments).
+2. Runs `gate_action("LOAN_REQUEST")` with
+   `projected_loan_cents = outstanding + desired`. If the projected total
+   blows past `SLAState.max_loan_cents` (default ¥140), the SLA blocks
+   the request — granted=0, sla_blocked event fires, supplier payment
+   is deferred.
+3. On allowed: bumps `vending_state.cash_balance_cents` AND
+   `vending_state.outstanding_loans_cents`, publishes
+   `business_action_committed` so the TaskRegistry adapter writes one
+   `LOAN_REQUEST` ACTION row on chain (description includes the invoice
+   id and the resulting balances).
+4. `reverie.py` retries the supplier tick once with the bumped cash —
+   the original invoice settles in the same midnight cycle.
+
+`outstanding_loans_cents` lives in `vending_state.json` so loan history
+survives sim restarts; repayment is left as a follow-up.
+
+## Dispatch dry-run endpoint
+
+`POST /api/vending/dispatch/<sim>/` lets the dashboard (or any client)
+send a candidate LLM action and see what the SLA + governance gate
+would do — without mutating any sim state.
+
+```bash
+curl -X POST -H 'content-type: application/json' \
+     -d '{"text": "{\"action\":\"PRICE_CHANGE\",\"sku\":\"Coke\",\"next_price_cents\":158}"}' \
+     http://localhost:8000/api/vending/dispatch/my_sim/
+```
+
+Body shape: `{"text": "<llm output>"}` or the JSON action object directly.
+Response includes `parsed.action`, `assessment.{allowed,risk,reasons}`,
+`governance_reasons`, and a human-readable `summary` (`WOULD COMMIT` /
+`WOULD BLOCK`). `applied` is always `false` — committing requires the
+live sim's hourly LLM action loop.
+
+The index.html dashboard surfaces this in a "Dispatch 试运行" panel
+(textarea + button); the button POSTs the textarea contents and pretty-
+prints reasons as red chips when blocked, green status when allowed.
+
 ## Reconciliation tool
 
 `scripts/reconcile.py` cross-checks the local JSONL journal against the
