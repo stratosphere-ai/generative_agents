@@ -286,16 +286,39 @@ revert on unknown parent, completeBatch flips status, recordAtomicAction
 end-state, atomic batch parallel + length-mismatch reject, plus 3 V1
 back-compat assertions).
 
+### Opportunistic batching (TxQueue window mode)
+
+When `BlockchainConfig.batch_window_sec > 0` (env: `TX_BATCH_WINDOW_SEC`),
+`TxQueue` waits up to that many seconds after the first item arrives,
+drains everything else (capped by `TX_MAX_BATCH_SIZE`, default 50),
+then calls `client._submit_many(items)` once. The client groups by kind:
+
+| 2+ same-kind items become                | RPC call                 |
+|------------------------------------------|--------------------------|
+| `start` × N (same window)                | `startTaskBatch`         |
+| `atomic` × N                             | `recordAtomicActionBatch`|
+| `complete` × N                           | `completeTaskBatch`      |
+
+Singleton kinds within the window fall through to their existing single-tx
+submit. Mixed kinds get N tx (one batch per kind). Items whose
+`parent_local_uuid` isn't yet on chain re-enqueue individually so a
+parent-not-found revert can't poison the whole batch. Batch failures
+(>1 item) skip the batch path on retry and dispatch each item via the
+single-item worker so a poison item gets isolated.
+
+Suggested defaults:
+- `TX_BATCH_WINDOW_SEC=0`   (off; default — predictable per-tx semantics)
+- `TX_BATCH_WINDOW_SEC=0.5` (light coalescing; ~2× tx reduction at peaks)
+- `TX_BATCH_WINDOW_SEC=2`   (aggressive; ~4× reduction, +2s sim-side latency)
+
 ### Gas / latency expectations (sim 1 day, ~200 tasks)
 
-| Surface | tx count | total gas (rough) | wall clock @ 2s/tx |
-|---|--:|--:|--:|
-| V1 only | ~200 | ~30M | ~7 min |
-| V2 (atomic for ACTION children) | ~110 | ~20M | ~4 min |
-| V2 + opportunistic batches      | ~50  | ~12M | ~100 s |
-
-The current adapter only uses V2's atomic shortcut; opportunistic batching
-of clustered HOURLY events is a follow-up if RPC-side cost matters.
+| Surface                         | tx count | total gas | wall clock @ 2s/tx |
+|---------------------------------|---------:|----------:|-------------------:|
+| V1 only                         |    ~200  |     ~30M  |             ~7 min |
+| V2 (atomic for ACTION children) |    ~110  |     ~20M  |             ~4 min |
+| V2 + window 0.5s coalescing     |     ~70  |     ~14M  |             ~140 s |
+| V2 + window 2s coalescing       |     ~45  |     ~11M  |              ~90 s |
 
 ## Forge test
 

@@ -23,6 +23,10 @@ class BlockchainConfig:
     payload_dir: Path
     confirm_blocks: int = 1
     tx_timeout_sec: float = 30.0
+    # V2 opportunistic batching: 0 disables, anything > 0 turns on the
+    # tx-queue time window and the client's per-kind grouping.
+    batch_window_sec: float = 0.0
+    max_batch_size: int    = 50
 
 
 def _env(name: str, default: str | None = None, *, required: bool = False) -> str:
@@ -56,4 +60,6 @@ def load_config(*, sim_storage_dir: Path) -> BlockchainConfig:
         payload_dir      = payload_dir,
         confirm_blocks   = int(_env("CONFIRM_BLOCKS", "1")),
         tx_timeout_sec   = float(_env("TX_TIMEOUT_SEC", "30")),
+        batch_window_sec = float(_env("TX_BATCH_WINDOW_SEC", "0")),
+        max_batch_size   = int(_env("TX_MAX_BATCH_SIZE",   "50")),
     )

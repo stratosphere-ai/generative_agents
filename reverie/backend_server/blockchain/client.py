@@ -61,7 +61,13 @@ class TaskRegistryClient:
     def __init__(self, config: BlockchainConfig) -> None:
         self.config   = config
         self.journal  = Journal(config.journal_path)
-        self._queue   = TxQueue(worker=self._submit, journal=self.journal)
+        self._queue   = TxQueue(
+            worker           = self._submit,
+            batch_worker     = self._submit_many,
+            batch_window_sec = config.batch_window_sec,
+            max_batch_size   = config.max_batch_size,
+            journal          = self.journal,
+        )
         self._pending: dict[str, _Pending] = {}
         self._local_to_onchain: dict[str, int] = {}
         self._lock    = threading.Lock()
@@ -394,6 +400,177 @@ class TaskRegistryClient:
                             on_chain_ids=ids,
                             tx_hash=tx_hash)
 
+    def _submit_many(self, items: list[tuple]) -> None:
+        """Batch worker: group same-kind queue items into single txs.
+
+        Called by TxQueue when batch_window_sec > 0. Items that don't
+        coalesce well (fail, start_batch / complete_batch already-batched
+        explicit calls) fall through to the per-item submit. start /
+        atomic / complete coalesce: 2+ items of the same kind go through
+        the V2 batch entry points.
+        """
+        if not items:
+            return
+        if self.config.mode == "dryrun":
+            self.journal.append("dryrun_skipped_batch", count=len(items),
+                                kinds=[it[0] for it in items])
+            return
+        try:
+            self._ensure_web3()
+        except Exception as exc:                              # noqa: BLE001
+            log.warning("web3 init failed (%s); falling back to dryrun for %d items", exc, len(items))
+            self.journal.append("dryrun_fallback_batch", count=len(items), error=str(exc))
+            return
+
+        starts:    list[str] = []
+        atomics:   list[str] = []
+        completes: list[str] = []
+        misc:      list[tuple] = []
+        for it in items:
+            kind = it[0]
+            if   kind == "start":           starts.append(it[1])
+            elif kind == "atomic":          atomics.append(it[1])
+            elif kind == "complete":        completes.append(it[1])
+            else:                           misc.append(it)
+
+        if len(starts) >= 2:
+            self._submit_start_batch_grouped(starts)
+        else:
+            for u in starts: self._submit_start(u)
+
+        if len(atomics) >= 2:
+            self._submit_atomic_batch_grouped(atomics)
+        else:
+            for u in atomics: self._submit_atomic(u)
+
+        if len(completes) >= 2:
+            self._submit_complete_batch_grouped(completes)
+        else:
+            for u in completes: self._submit_complete(u)
+
+        for it in misc:
+            kind = it[0]
+            if   kind == "fail":            self._submit_fail(it[1], it[2])
+            elif kind == "start_batch":     self._submit_start_batch(it[1])
+            elif kind == "complete_batch":  self._submit_complete_batch(it[1])
+            else:                                                # pragma: no cover
+                log.warning("tx-queue _submit_many: unknown kind %r", kind)
+
+    def _submit_start_batch_grouped(self, local_uuids: list[str]) -> None:
+        """Like _submit_start_batch but starts from individual `start` items.
+
+        Items whose parents aren't yet on chain get re-enqueued individually
+        so they don't poison the whole batch with a parent-not-found revert.
+        """
+        with self._lock:
+            ready: list[str]   = []
+            ready_pending      = []
+            ready_parents      = []
+            for u in local_uuids:
+                p = self._pending[u]
+                if p.parent_local_uuid:
+                    parent_id = self._local_to_onchain.get(p.parent_local_uuid)
+                    if parent_id is None:
+                        self._queue.enqueue(("start", u))
+                        continue
+                else:
+                    parent_id = 0
+                ready.append(u)
+                ready_pending.append(p)
+                ready_parents.append(parent_id)
+        if not ready:
+            return
+        if len(ready) == 1:
+            self._submit_start(ready[0])
+            return
+
+        starts = [{
+            "parentId":        parent_id,
+            "taskType":        keccak256_text(p.task_type),
+            "descriptionHash": keccak256_text(p.description),
+            "eventSPO":        keccak256_text("|".join(p.event_spo)),
+            "cid":             "",
+        } for p, parent_id in zip(ready_pending, ready_parents)]
+        tx_hash, ids = self._call_start_batch(starts)
+        with self._lock:
+            for u, oid in zip(ready, ids):
+                self._local_to_onchain[u] = oid
+        self.journal.append("tx_start_batch_grouped",
+                            count=len(ready), local_uuids=ready,
+                            on_chain_ids=ids, tx_hash=tx_hash)
+
+    def _submit_atomic_batch_grouped(self, local_uuids: list[str]) -> None:
+        with self._lock:
+            ready: list[str] = []
+            ready_pending    = []
+            ready_parents    = []
+            for u in local_uuids:
+                p = self._pending[u]
+                if p.parent_local_uuid:
+                    parent_id = self._local_to_onchain.get(p.parent_local_uuid)
+                    if parent_id is None:
+                        self._queue.enqueue(("atomic", u))
+                        continue
+                else:
+                    parent_id = 0
+                ready.append(u)
+                ready_pending.append(p)
+                ready_parents.append(parent_id)
+        if not ready:
+            return
+        if len(ready) == 1:
+            self._submit_atomic(ready[0])
+            return
+
+        starts: list[dict] = []
+        result_hashes: list[bytes] = []
+        for u, p, parent_id in zip(ready, ready_pending, ready_parents):
+            starts.append({
+                "parentId":        parent_id,
+                "taskType":        keccak256_text(p.task_type),
+                "descriptionHash": keccak256_text(p.description),
+                "eventSPO":        keccak256_text("|".join(p.event_spo)),
+                "cid":             "",
+            })
+            result_path = self.config.payload_dir / f"{u}.result.json"
+            result_obj  = json.loads(result_path.read_text(encoding="utf-8")) if result_path.exists() else {}
+            result_hashes.append(keccak256_json(result_obj))
+
+        tx_hash, ids = self._call_atomic_batch(starts, result_hashes)
+        with self._lock:
+            for u, oid in zip(ready, ids):
+                self._local_to_onchain[u] = oid
+        self.journal.append("tx_atomic_batch_grouped",
+                            count=len(ready), local_uuids=ready,
+                            on_chain_ids=ids, tx_hash=tx_hash)
+
+    def _submit_complete_batch_grouped(self, local_uuids: list[str]) -> None:
+        with self._lock:
+            ready: list[str] = []
+            ready_ids: list[int] = []
+            for u in local_uuids:
+                oid = self._local_to_onchain.get(u)
+                if oid is None:
+                    self._queue.enqueue(("complete", u))
+                    continue
+                ready.append(u)
+                ready_ids.append(oid)
+        if not ready:
+            return
+        if len(ready) == 1:
+            self._submit_complete(ready[0])
+            return
+
+        completes = []
+        for u, oid in zip(ready, ready_ids):
+            result_path = self.config.payload_dir / f"{u}.result.json"
+            result_obj  = json.loads(result_path.read_text(encoding="utf-8")) if result_path.exists() else {}
+            completes.append({"id": oid, "resultHash": keccak256_json(result_obj), "cid": ""})
+        tx_hash = self._call_complete_batch(completes)
+        self.journal.append("tx_complete_batch_grouped",
+                            count=len(ready), local_uuids=ready,
+                            on_chain_ids=ready_ids, tx_hash=tx_hash)
+
     def _submit_complete_batch(self, local_uuids: list[str]) -> None:
         with self._lock:
             ids: list[int] = []
@@ -495,6 +672,17 @@ class TaskRegistryClient:
         fn = self._contract.functions.completeTaskBatch(items)
         receipt = self._send(fn)
         return receipt.transactionHash.hex()
+
+    def _call_atomic_batch(
+        self,
+        starts: list[dict],
+        result_hashes: list[bytes],
+    ) -> tuple[str, list[int]]:
+        fn = self._contract.functions.recordAtomicActionBatch(starts, result_hashes)
+        receipt = self._send(fn)
+        events = self._contract.events.AtomicActionRecorded().process_receipt(receipt)
+        ids = [int(e["args"]["id"]) for e in events]
+        return receipt.transactionHash.hex(), ids
 
     def _send(self, fn):
         w3      = self._w3
