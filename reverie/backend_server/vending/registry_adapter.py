@@ -104,3 +104,15 @@ class TaskRegistryAdapter:
             },
         )
         self.client.complete_task(local, {"timestamp": e["timestamp"]})
+
+    def _on_business_action_committed(self, e: Mapping[str, Any]) -> None:
+        # Business decisions (price changes, restocks, ...) are atomic ACTIONs
+        # nested under the current hourly plan.
+        local = self.client.start_task(
+            parent_local_uuid = self.current_hourly_local_uuid,
+            task_type         = "ACTION",
+            description       = e["description"],
+            event_spo         = tuple(e.get("event_spo") or (VENDY, "did", e.get("action") or "action")),
+            payload           = e.get("payload") or {},
+        )
+        self.client.complete_task(local, {"timestamp": e.get("timestamp")})

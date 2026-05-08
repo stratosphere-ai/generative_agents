@@ -104,6 +104,17 @@ def commit_price_change(
     gov: PriceGovernance | None = getattr(persona, "price_governance", None)
     if gov is not None:
         gov.record_change(sku, prev, int(new_price_cents), now)
+
+    bus.publish({
+        "kind":        "business_action_committed",
+        "persona":     VENDY,
+        "action":      "PRICE_CHANGE",
+        "description": f"调价 {sku} ¥{prev / 100:.2f} → ¥{new_price_cents / 100:.2f}",
+        "event_spo":   (VENDY, "set-price", sku),
+        "payload":     {"sku": sku, "previous_price_cents": prev,
+                        "next_price_cents": int(new_price_cents)},
+        "timestamp":   now.isoformat(),
+    })
     return assessment
 
 
@@ -136,5 +147,19 @@ def commit_restock(
     if not assessment.allowed:
         return assessment
 
-    ledger.place_order(supplier_id, items, order_date)
+    order = ledger.place_order(supplier_id, items, order_date)
+    items_desc = "、".join(f"{sku}×{qty}" for sku, qty in items)
+    bus.publish({
+        "kind":        "business_action_committed",
+        "persona":     VENDY,
+        "action":      "RESTOCK_ORDER",
+        "description": f"补货 [{contract.label}] {items_desc} = ¥{order_cost / 100:.2f}",
+        "event_spo":   (VENDY, "ordered-from", supplier_id),
+        "payload":     {"order_id":         order.order_id,
+                        "supplier_id":      supplier_id,
+                        "items":            list(items),
+                        "order_cost_cents": order_cost,
+                        "order_date":       order_date.isoformat()},
+        "timestamp":   order_date.isoformat(),
+    })
     return assessment

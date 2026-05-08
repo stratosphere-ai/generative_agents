@@ -172,3 +172,98 @@ def test_blocked_action_increments_daily_report_via_bus(fresh_bus):
     fresh_bus.publish({"kind": "day_end",   "persona": p.name, "date": "2026-04-28"})
 
     assert p.daily_report_log.last_report.sla_blocked == 1
+
+
+# ---- on-chain wiring via TaskRegistryAdapter -----------------------------
+
+
+def test_commit_price_change_writes_atomic_action_on_chain(fresh_bus):
+    from vending.action_gate import commit_price_change
+    from vending.registry_adapter import TaskRegistryAdapter
+    from blockchain.mock import MockTaskRegistryClient
+
+    p = _make_vendy()
+    client  = MockTaskRegistryClient()
+    adapter = TaskRegistryAdapter(client)
+    adapter.attach()
+
+    fresh_bus.publish({
+        "kind":        "hourly_start",
+        "persona":     p.name,
+        "hour":        12,
+        "date":        "2026-04-28",
+        "description": "operate lunch peak",
+    })
+    res = commit_price_change(p, sku="Coke", new_price_cents=158,
+                              now=_dt.datetime(2026, 4, 28, 12, 5, 0))
+    assert res.allowed is True
+
+    tasks = client.all_tasks()
+    # 1 HOURLY parent + 1 PRICE_CHANGE atomic ACTION child
+    assert len(tasks) == 2
+    parent, child = tasks
+    assert parent.task_type == "HOURLY"
+    assert child.task_type  == "ACTION"
+    assert child.parent_id  == parent.on_chain_id
+    assert child.status     == "completed"
+    assert "调价" in child.description
+    assert "Coke" in child.description
+    assert child.event_spo  == ("Vendy Unit-001", "set-price", "Coke")
+
+
+def test_commit_restock_writes_atomic_action_on_chain(fresh_bus):
+    from vending.action_gate import commit_restock
+    from vending.registry_adapter import TaskRegistryAdapter
+    from blockchain.mock import MockTaskRegistryClient
+
+    p = _make_vendy()
+    client  = MockTaskRegistryClient()
+    adapter = TaskRegistryAdapter(client)
+    adapter.attach()
+
+    fresh_bus.publish({
+        "kind":        "hourly_start",
+        "persona":     p.name,
+        "hour":        9,
+        "date":        "2026-04-28",
+        "description": "morning ops",
+    })
+    res = commit_restock(p, supplier_id="suntory",
+                         items=[("Coke", 12), ("Water", 12)],
+                         order_date=_dt.date(2026, 4, 28),
+                         observation={"stock_at_risk": ["Water"]})
+    assert res.allowed is True
+
+    tasks = client.all_tasks()
+    assert len(tasks) == 2
+    child = tasks[1]
+    assert child.task_type == "ACTION"
+    assert child.event_spo == ("Vendy Unit-001", "ordered-from", "suntory")
+    assert "Coke×12" in child.description
+    assert "サントリー" in child.description
+
+
+def test_blocked_commit_does_not_write_to_chain(fresh_bus):
+    from vending.action_gate import commit_restock
+    from vending.registry_adapter import TaskRegistryAdapter
+    from blockchain.mock import MockTaskRegistryClient
+
+    p = _make_vendy()
+    client = MockTaskRegistryClient()
+    TaskRegistryAdapter(client).attach()
+
+    fresh_bus.publish({
+        "kind":        "hourly_start",
+        "persona":     p.name,
+        "hour":        9,
+        "date":        "2026-04-28",
+        "description": "morning ops",
+    })
+    # Oversized order — gate blocks, no business_action_committed event fires.
+    res = commit_restock(p, supplier_id="suntory",
+                         items=[("Coke", 200)],
+                         order_date=_dt.date(2026, 4, 28))
+    assert res.allowed is False
+    # Only the HOURLY parent was created; no child ACTION.
+    assert len(client.all_tasks()) == 1
+    assert client.all_tasks()[0].task_type == "HOURLY"
