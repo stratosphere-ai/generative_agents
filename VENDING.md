@@ -242,6 +242,67 @@ of Vendy's business state:
 Sections are skipped silently when an endpoint 404s, so the dashboard still
 runs against earlier sims that don't have the new persistent state files.
 
+## LLM action parser & dispatch
+
+`vending/action_parser.py` is the bridge between Vendy's LLM output and
+the SLA action gate. The recommended JSON schema for the LLM to emit is:
+
+```json
+{"action": "PRICE_CHANGE", "sku": "Coke", "next_price_cents": 158, "rationale": "lunch peak coming"}
+{"action": "RESTOCK_ORDER", "supplier_id": "suntory", "items": [["Coke", 12], ["Water", 12]]}
+{"action": "NO_OP"}
+```
+
+`parse_action(text)` accepts either a Mapping or a string and tolerates:
+- ` ```json ... ``` ` fenced blocks
+- inline JSON anywhere in surrounding prose
+- price expressed as `next_price_cents` (int) or `next_price_yen` (float)
+- items expressed as `[[sku, qty], ...]` or `[{"sku": ..., "qty": ...}, ...]`
+
+`dispatch(persona, text, now)` returns `(Assessment, applied, summary)`:
+SLA-blocked actions don't mutate state; the summary line is suitable for
+inclusion in Vendy's reflection memory.
+
+```python
+from vending.action_parser import dispatch
+import datetime as dt
+
+assess, applied, summary = dispatch(vendy, llm_output, now=dt.datetime.now())
+# summary: "PRICE_CHANGE Coke→¥1.58: committed"
+#       or "PRICE_CHANGE Coke→¥2.50: BLOCKED（调价幅度超过保单限制）"
+```
+
+Successful commits also publish `business_action_committed` so the
+TaskRegistry adapter writes one ACTION row on chain (under the current
+HOURLY parent).
+
+## Reconciliation tool
+
+`scripts/reconcile.py` cross-checks the local JSONL journal against the
+on-chain `TaskRegistry` events. Two modes:
+
+```bash
+# Offline summary — no chain access needed
+python scripts/reconcile.py --sim my_sim --mode summary
+
+# Full diff against anvil / testnet
+python scripts/reconcile.py --sim my_sim --mode chain \
+    --rpc-url http://127.0.0.1:8545 \
+    --contract-address 0x...
+```
+
+Buckets reported:
+
+| Bucket | Meaning |
+|---|---|
+| `unsubmitted_intents` | `intent_start` written but no `tx_start` receipt — tx queue stuck or sim was killed mid-flight |
+| `pending_completes` | `intent_complete` journaled but `tx_complete` missing — completion never confirmed |
+| `pending_fails` | `intent_fail` journaled but `tx_fail` missing |
+| `chain_only_starts` | `TaskStarted` event on chain that no journal entry references — journal corruption / wrong sim |
+| `status_mismatch` | journal says Completed/Failed but chain still Started, or vice-versa |
+
+Exit code is 0 on no drift, 1 when any bucket is non-empty, 2 on usage error.
+
 ## Per-persona model routing
 
 `reverie/backend_server/vending/model_router.py` monkey-patches
