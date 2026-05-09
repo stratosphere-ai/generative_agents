@@ -1,0 +1,118 @@
+{
+  "_seq": 8,
+  "contracts": {
+    "suntory": {
+      "supplier_id": "suntory",
+      "label": "サントリー",
+      "cutoff_day": 31,
+      "payment_offset_months": 1,
+      "payment_day": 31,
+      "consumption_tax_rate": 0.08,
+      "transfer_fee_cents_buyer": 220,
+      "early_payment_discount": 0.0,
+      "sku_unit_costs_cents": {
+        "Coke": 60,
+        "Water": 40,
+        "Coffee": 100
+      }
+    },
+    "calbee": {
+      "supplier_id": "calbee",
+      "label": "カルビー",
+      "cutoff_day": 20,
+      "payment_offset_months": 1,
+      "payment_day": 10,
+      "consumption_tax_rate": 0.08,
+      "transfer_fee_cents_buyer": 220,
+      "early_payment_discount": 0.0,
+      "sku_unit_costs_cents": {
+        "Chips": 80,
+        "Chocolate": 70
+      }
+    }
+  },
+  "open_orders": [
+    {
+      "order_id": "PO-00007",
+      "supplier_id": "suntory",
+      "order_date": "2026-04-28",
+      "items": [
+        [
+          "Coke",
+          24
+        ],
+        [
+          "Water",
+          12
+        ]
+      ],
+      "invoiced": false
+    }
+  ],
+  "invoices": [
+    {
+      "invoice_id": "INV-00005",
+      "supplier_id": "suntory",
+      "cutoff_date": "2026-04-30",
+      "due_date": "2026-05-31",
+      "lines": [
+        {
+          "sku": "Coke",
+          "quantity": 36,
+          "unit_cost_cents": 60
+        },
+        {
+          "sku": "Water",
+          "quantity": 24,
+          "unit_cost_cents": 40
+        }
+      ],
+      "subtotal_cents": 3120,
+      "tax_cents": 250,
+      "transfer_fee_cents": 220,
+      "total_cents": 3590,
+      "paid": false,
+      "paid_date": null
+    },
+    {
+      "invoice_id": "INV-00006",
+      "supplier_id": "calbee",
+      "cutoff_date": "2026-04-20",
+      "due_date": "2026-05-10",
+      "lines": [
+        {
+          "sku": "Chips",
+          "quantity": 24,
+          "unit_cost_cents": 80
+        }
+      ],
+      "subtotal_cents": 1920,
+      "tax_cents": 154,
+      "transfer_fee_cents": 220,
+      "total_cents": 2294,
+      "paid": false,
+      "paid_date": null
+    }
+  ],
+  "history": [
+    {
+      "invoice_id": "INV-00003",
+      "supplier_id": "suntory",
+      "cutoff_date": "2026-03-31",
+      "due_date": "2026-04-30",
+      "lines": [
+        {
+          "sku": "Coke",
+          "quantity": 24,
+          "unit_cost_cents": 60
+        }
+      ],
+      "subtotal_cents": 1440,
+      "tax_cents": 115,
+      "transfer_fee_cents": 220,
+      "total_cents": 1775,
+      "paid": true,
+      "paid_date": "2026-04-30"
+    }
+  ]
+}

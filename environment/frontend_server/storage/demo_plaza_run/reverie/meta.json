@@ -1,0 +1,14 @@
+{
+  "fork_sim_code": "base_vending_min",
+  "start_date": "April 28, 2026",
+  "curr_time": "April 28, 2026, 12:42:00",
+  "sec_per_step": 10,
+  "maze_name": "vending",
+  "persona_names": [
+    "Vendy Unit-001",
+    "Lin Wei",
+    "Marco Silva",
+    "Hana Park"
+  ],
+  "step": 756
+}

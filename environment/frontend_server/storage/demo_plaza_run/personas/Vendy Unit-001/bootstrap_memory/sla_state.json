@@ -1,0 +1,12 @@
+{
+  "enabled": true,
+  "coverage_pool_cents": 12500,
+  "premium_paid_cents": 850,
+  "blocked": 2,
+  "claims": 0,
+  "max_loan_cents": 14000,
+  "max_order_cost_cents": 4800,
+  "max_price_change": 0.45,
+  "risk_limit": 72,
+  "last_assessment": "PRICE_CHANGE 风险 38"
+}

@@ -14,7 +14,27 @@ from django.shortcuts import render, redirect, HttpResponseRedirect
 from django.http import HttpResponse, JsonResponse
 from global_methods import *
 
-from django.contrib.staticfiles.templatetags.staticfiles import static
+try:
+    from django.contrib.staticfiles.templatetags.staticfiles import static  # Django <3.0
+except ImportError:
+    from django.templatetags.static import static                            # Django >=3.0
+
+
+def vending_dashboard(request):
+    """Serve the standalone repo-root index.html as the project landing.
+
+    Reads from <repo_root>/index.html (two levels up from frontend_server).
+    The page works in playground mode out-of-the-box; the Live toggle hits
+    the /api/vending/* endpoints when a sim_code is provided.
+    """
+    import os
+    from django.http import HttpResponse, HttpResponseNotFound
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+    path = os.path.join(repo_root, "index.html")
+    if not os.path.exists(path):
+        return HttpResponseNotFound("index.html not found")
+    with open(path, "rb") as f:
+        return HttpResponse(f.read(), content_type="text/html; charset=utf-8")
 from .models import *
 
 def landing(request): 

@@ -1,0 +1,21 @@
+{
+  "inventory": {
+    "Coke": 14,
+    "Water": 9,
+    "Coffee": 7,
+    "Chips": 6,
+    "Chocolate": 3
+  },
+  "prices_cents": {
+    "Coke": 158,
+    "Water": 105,
+    "Coffee": 250,
+    "Chips": 200,
+    "Chocolate": 175
+  },
+  "cash_balance_cents": 2840,
+  "power_pct": 87.5,
+  "last_restock_iso": "2026-04-28T08:15:00",
+  "wallet_address": "0xa11ce0000000000000000000000000000000abcd",
+  "outstanding_loans_cents": 10000
+}

@@ -1,0 +1,13 @@
+{
+  "min_interval_hours": 12,
+  "max_daily_changes": 1,
+  "max_single_change_rate": 0.12,
+  "last_changed": {
+    "Coke": "2026-04-28T08:30:00"
+  },
+  "changes_today": {
+    "Coke": 1
+  },
+  "today_iso_date": "2026-04-28",
+  "last_action": "Coke ¥1.50 → ¥1.58 (+5.3%)"
+}

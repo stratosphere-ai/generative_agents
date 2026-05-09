@@ -96,6 +96,9 @@ celerybeat-schedule
 **/blockchain_journal.jsonl
 **/task_payloads/
 
+# Allow the seeded demo sim's journal so DEPLOY.md works on a fresh clone.
+!environment/frontend_server/storage/demo_plaza_run/blockchain_journal.jsonl
+
 # virtualenv
 venv/
 ENV/

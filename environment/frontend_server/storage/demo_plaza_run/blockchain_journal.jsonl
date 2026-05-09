@@ -1,0 +1,7 @@
+{"ts": 1, "kind": "intent_start", "local_uuid": "u1", "description": "operate lunch peak", "task_type": "HOURLY", "event_spo": ["Vendy Unit-001", "plans", "lunch"], "parent_local_uuid": null, "payload_path": ""}
+{"ts": 2, "kind": "tx_start", "local_uuid": "u1", "on_chain_id": 12, "tx_hash": "0xa11c0de00000000000000000000000000000000000000000000000000000000"}
+{"ts": 3, "kind": "intent_atomic", "local_uuid": "u2", "description": "sold Coke to Marco for $1.58", "task_type": "ACTION", "event_spo": ["Vendy Unit-001", "sold", "Coke"], "parent_local_uuid": "u1", "payload_path": "", "result_path": ""}
+{"ts": 4, "kind": "tx_atomic", "local_uuid": "u2", "on_chain_id": 13, "tx_hash": "0xb22d1ef00000000000000000000000000000000000000000000000000000000"}
+{"ts": 5, "kind": "intent_atomic", "local_uuid": "u3", "description": "\u8c03\u4ef7 Coke \u00a51.50 \u2192 \u00a51.58", "task_type": "ACTION", "event_spo": ["Vendy Unit-001", "set-price", "Coke"], "parent_local_uuid": "u1", "payload_path": "", "result_path": ""}
+{"ts": 6, "kind": "tx_atomic", "local_uuid": "u3", "on_chain_id": 14, "tx_hash": "0xc33e2fa00000000000000000000000000000000000000000000000000000000"}
+{"ts": 7, "kind": "intent_start", "local_uuid": "stuck-1", "description": "RESTOCK_ORDER suntory Coke\u00d724", "task_type": "ACTION", "event_spo": ["Vendy Unit-001", "ordered-from", "suntory"], "parent_local_uuid": "u1", "payload_path": ""}
