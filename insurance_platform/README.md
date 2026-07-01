@@ -175,3 +175,25 @@ INSURE_DISCOVERY=llm INSURE_MATCH=on ./run.sh
 Both paths degrade gracefully, so this sandbox (no key, Polymarket/Kalshi
 blocked) runs `rule` + synthetic; the LLM/real-match code is exercised in tests
 via mocks (`tests/test_discovery.py`, `test_matching.py`, `test_engine.py`).
+
+## Run with Docker (no local Python setup)
+
+```bash
+cd insurance_platform
+docker build -t predinsure .
+docker run -p 8100:8100 predinsure
+# open http://localhost:8100/
+```
+Force deterministic mock data: `docker run -p 8100:8100 -e INSURE_PROVIDER=mock predinsure`.
+Enable the real/intelligent path: add `-e ANTHROPIC_API_KEY=sk-... -e INSURE_DISCOVERY=llm -e INSURE_MATCH=on`.
+
+## Deploy for a public URL (Render, free)
+
+A `render.yaml` blueprint is included. To get a public `https://…` link (works on mobile):
+1. Push this repo to GitHub (already on your fork/branch).
+2. Render → **New → Blueprint** → pick the repo → **Apply**.
+3. Render builds the Docker image and serves it; open the assigned URL.
+
+It deploys keyless (auto-falls back to mock/rule). To enable the intelligent path,
+set `ANTHROPIC_API_KEY`, `INSURE_DISCOVERY=llm`, `INSURE_MATCH=on` in the Render
+dashboard. The same `Dockerfile` also works on Railway, Fly.io, or any container host.

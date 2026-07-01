@@ -1,0 +1,22 @@
+# Render Blueprint — deploy PredInsure for a public https:// URL.
+# In Render: New → Blueprint → pick this repo → Apply. Free tier, no keys needed.
+services:
+  - type: web
+    name: predinsure
+    runtime: docker
+    plan: free
+    dockerfilePath: insurance_platform/Dockerfile
+    dockerContext: insurance_platform
+    healthCheckPath: /health
+    envVars:
+      # Offline-safe defaults — runs with no secrets (auto-falls back to mock/rule).
+      - key: INSURE_PROVIDER
+        value: polymarket
+      - key: INSURE_DISCOVERY
+        value: rule
+      - key: INSURE_MATCH
+        value: "off"
+      # Enable the intelligent/real path by setting these in the Render dashboard:
+      #   ANTHROPIC_API_KEY = sk-...      (turns on LLM factor discovery)
+      #   INSURE_DISCOVERY  = llm
+      #   INSURE_MATCH      = on          (real Polymarket/Kalshi order-book matching)
