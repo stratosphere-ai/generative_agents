@@ -71,7 +71,7 @@ Config via env vars:
 | `INSURE_PROVIDER` | `polymarket` | `polymarket` (real, auto-fallback) or `mock` |
 | `INSURE_LOADING_FACTOR` | `0.15` | insurer margin on top of fair premium |
 | `INSURE_MIN_SOLVENCY` | `1.0` | min cash/reserved ratio to underwrite |
-| `INSURE_SEED_CAPITAL` | `10000` | starting pool cash |
+| `INSURE_SEED_CAPITAL` | `2000000` | starting pool cash (large enough for cargo baskets) |
 | `INSURE_PORT` | `8100` | server port (avoids the repo's Django app on 8000) |
 
 ## API
@@ -105,3 +105,35 @@ curl -X POST localhost:8100/api/admin/resolve -H 'content-type: application/json
 
 End-to-end in the UI: **Browse** → 一键投保 → **My Policies** → **Admin** resolve → see
 the payout reflected in the pool.
+
+## Cargo basket policies (P1) — one policy, many hedged factors
+
+Beyond single-event cover, the platform insures a **shipment** against a *basket*
+of correlated risk factors. The buyer's experience is unchanged — submit the
+cargo details, see one premium, click **一键投保** — but behind the scenes a rule
+engine fans the shipment out into a hedged portfolio.
+
+**Flow.** `POST /api/shipments/quote` → the risk engine (`app/risk_engine.py`)
+picks the relevant factors (route/geopolitical/macro/weather) by route keywords,
+prices each as a mini single-event cover, and returns the total premium plus the
+factor breakdown. `POST /api/shipments/policies` issues one `BasketPolicy` with a
+`HedgeLeg` per factor, each hedged on its own market book. Resolving a factor
+book in Admin settles that leg across every policy referencing it.
+
+**Economics (per factor i).** `covered_loss_i = impact_i · cargo_value`;
+`premium_i = covered_loss_i · p_i · (1 + loading)`; hedge buys `covered_loss_i`
+YES-shares at `p_i`. Policy totals are the sums. **P1 assumes factors are
+independent and losses additive** — correlation, a value cap, basis risk and
+order-book depth/slippage are deferred to later phases (see the roadmap).
+
+**Endpoints:** `POST /api/shipments/quote`, `POST /api/shipments/policies`,
+`GET /api/shipments/policies`. **Frontend:** `static/cargo.html`.
+
+> Because a $400k cargo reserves a large liability, the default seed capital is
+> `INSURE_SEED_CAPITAL=2_000_000`. This is P1 *gross* reserving; capital-efficient
+> net reserving (crediting the hedge assets against liabilities) is a later item.
+
+### Roadmap
+- **P1 (done):** basket data model, rule-based engine, portfolio premium/solvency, cargo UI.
+- **P2:** LLM-based factor *discovery* + real order-book mapping (multi-provider).
+- **P3:** factor correlation & joint-loss model, basis-risk capital, CLOB depth/slippage, parametric delivery oracle for claims.

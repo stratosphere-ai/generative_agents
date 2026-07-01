@@ -38,6 +38,22 @@ POLICY_ACTIVE = "active"
 POLICY_PAID_OUT = "paid_out"
 POLICY_EXPIRED_WORTHLESS = "expired_worthless"
 
+# --- Basket (cargo) policy statuses ---
+BASKET_ACTIVE = "active"
+BASKET_PARTIALLY_SETTLED = "partially_settled"
+BASKET_SETTLED = "settled"
+
+# --- Hedge leg statuses (mirror single-event policy statuses) ---
+LEG_ACTIVE = "active"
+LEG_PAID_OUT = "paid_out"
+LEG_EXPIRED_WORTHLESS = "expired_worthless"
+
+# --- Risk-factor categories ---
+CAT_ROUTE = "route"
+CAT_GEOPOLITICAL = "geopolitical"
+CAT_MACRO = "macro"
+CAT_WEATHER = "weather"
+
 # --- Ledger entry types (see ledger.py for sign convention) ---
 ENTRY_SEED = "seed_capital"
 ENTRY_PREMIUM_IN = "premium_in"
@@ -100,6 +116,74 @@ class Policy(Base):
     market: Mapped["Market"] = relationship(back_populates="policies")
 
 
+class Shipment(Base):
+    """The real-world insured object: a cargo that must arrive on time."""
+
+    __tablename__ = "shipments"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    cargo_value: Mapped[float] = mapped_column(Float)  # insured value, e.g. 400_000
+    origin: Mapped[str] = mapped_column(String(128))
+    destination: Mapped[str] = mapped_column(String(128))
+    deadline: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    cargo_type: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    route: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    policy: Mapped["BasketPolicy"] = relationship(back_populates="shipment", uselist=False)
+
+
+class BasketPolicy(Base):
+    """One policy covering a shipment against many correlated risk factors.
+
+    From the buyer's view it is a single premium; internally it fans out into a
+    portfolio of HedgeLegs, one per prediction-market book we bet on.
+    """
+
+    __tablename__ = "basket_policies"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    shipment_id: Mapped[int] = mapped_column(ForeignKey("shipments.id"))
+    premium: Mapped[float] = mapped_column(Float)  # total charged
+    total_covered: Mapped[float] = mapped_column(Float)  # sum of leg covered losses
+    total_reserve: Mapped[float] = mapped_column(Float)  # liability held
+    loading_factor: Mapped[float] = mapped_column(Float)
+    status: Mapped[str] = mapped_column(String(24), default=BASKET_ACTIVE)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+    shipment: Mapped["Shipment"] = relationship(back_populates="policy")
+    legs: Mapped[list["HedgeLeg"]] = relationship(
+        back_populates="policy", cascade="all, delete-orphan"
+    )
+
+
+class HedgeLeg(Base):
+    """One risk factor within a basket policy, hedged via one market book."""
+
+    __tablename__ = "hedge_legs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    basket_policy_id: Mapped[int] = mapped_column(ForeignKey("basket_policies.id"))
+    market_id: Mapped[int] = mapped_column(ForeignKey("markets.id"))
+
+    factor_key: Mapped[str] = mapped_column(String(64))
+    factor_label: Mapped[str] = mapped_column(Text)
+    category: Mapped[str] = mapped_column(String(24))
+    impact: Mapped[float] = mapped_column(Float)  # loss fraction of cargo value
+    covered_loss: Mapped[float] = mapped_column(Float)  # impact * cargo_value
+    probability_at_purchase: Mapped[float] = mapped_column(Float)
+    premium: Mapped[float] = mapped_column(Float)  # leg's share of the premium
+    hedge_shares: Mapped[float] = mapped_column(Float)  # = covered_loss
+    hedge_price: Mapped[float] = mapped_column(Float)  # = probability
+    status: Mapped[str] = mapped_column(String(24), default=LEG_ACTIVE)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    policy: Mapped["BasketPolicy"] = relationship(back_populates="legs")
+    market: Mapped["Market"] = relationship()
+
+
 class CapitalPool(Base):
     """Singleton (id=1) cache of pool balances, derived from the ledger."""
 
@@ -120,6 +204,9 @@ class LedgerEntry(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     ts: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     policy_id: Mapped[int | None] = mapped_column(ForeignKey("policies.id"), nullable=True)
+    basket_policy_id: Mapped[int | None] = mapped_column(
+        ForeignKey("basket_policies.id"), nullable=True
+    )
     entry_type: Mapped[str] = mapped_column(String(32))
     amount: Mapped[float] = mapped_column(Float)  # signed: inflow +, outflow -
     memo: Mapped[str] = mapped_column(String(255), default="")

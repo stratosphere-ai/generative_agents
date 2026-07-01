@@ -30,7 +30,7 @@ class Settings:
     # Minimum cash / reserved-liabilities ratio required to underwrite a policy.
     min_solvency: float = _get_float("INSURE_MIN_SOLVENCY", 1.0)
     # Cash the pool is seeded with on first run.
-    seed_capital: float = _get_float("INSURE_SEED_CAPITAL", 10_000.0)
+    seed_capital: float = _get_float("INSURE_SEED_CAPITAL", 2_000_000.0)
     # SQLAlchemy URL. Defaults to a file DB under data/.
     database_url: str = os.environ.get(
         "INSURE_DATABASE_URL", f"sqlite:///{DATA_DIR / 'insurance.db'}"

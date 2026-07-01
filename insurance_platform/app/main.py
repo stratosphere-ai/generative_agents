@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .config import STATIC_DIR, settings
 from .db import init_db
-from .routers import admin, markets, policies, pool
+from .routers import admin, markets, policies, pool, shipments
 
 logging.basicConfig(level=logging.INFO)
 
@@ -38,6 +38,7 @@ app.include_router(markets.router)
 app.include_router(policies.router)
 app.include_router(pool.router)
 app.include_router(admin.router)
+app.include_router(shipments.router)
 
 
 @app.get("/health")

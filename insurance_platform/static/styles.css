@@ -135,3 +135,7 @@ th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: upp
 
 .empty { color: var(--muted); padding: 40px; text-align: center; }
 .resolve-cell { display: flex; gap: 8px; }
+
+/* basket (cargo) policy statuses */
+.badge.settled { background: #14432a; color: #6ee7a8; }
+.badge.partially_settled { background: #3a3520; color: #f0d68f; }

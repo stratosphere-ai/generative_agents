@@ -73,3 +73,28 @@ def can_underwrite(
     """
     projected = solvency_ratio(cash_balance, reserved_liabilities + new_reserve)
     return projected >= min_ratio
+
+
+# --- Basket (cargo) helpers: a shipment is hedged as a portfolio of factors. ---
+
+def factor_covered_loss(cargo_value: float, impact: float) -> float:
+    """Dollar loss put at risk by one factor = impact fraction of cargo value."""
+    if cargo_value <= 0:
+        raise ValueError("cargo_value must be positive")
+    if not 0 < impact <= 1:
+        raise ValueError("impact must be in (0, 1]")
+    return cargo_value * impact
+
+
+def factor_expected_loss(cargo_value: float, impact: float, p: float) -> float:
+    """Probability-weighted loss for one factor."""
+    return factor_covered_loss(cargo_value, impact) * clamp_probability(p)
+
+
+def basket_premium(assessments) -> float:
+    """Total premium of a basket = sum of per-factor premiums.
+
+    P1 assumes factors are independent and their losses are additive; joint-loss
+    modelling and a cap at cargo value are deferred to P3 (correlation + basis).
+    """
+    return sum(a.premium for a in assessments)

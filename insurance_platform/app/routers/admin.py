@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from .. import models, settlement
 from ..db import get_session
 from ..deps import pool_snapshot
-from ..models import Market, Policy
+from ..models import HedgeLeg, Market, Policy
 from ..schemas import AdminMarketOut, ResolveRequest, ResolveResponse
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -19,16 +19,28 @@ def admin_markets(session: Session = Depends(get_session)):
     markets = session.scalars(select(Market).order_by(Market.id)).all()
     out = []
     for m in markets:
-        count = session.scalar(
+        pol_count = session.scalar(
             select(func.count(Policy.id)).where(
                 Policy.market_id == m.id, Policy.status == models.POLICY_ACTIVE
             )
         ) or 0
-        exposure = session.scalar(
+        pol_exposure = session.scalar(
             select(func.coalesce(func.sum(Policy.coverage), 0.0)).where(
                 Policy.market_id == m.id, Policy.status == models.POLICY_ACTIVE
             )
         ) or 0.0
+        leg_count = session.scalar(
+            select(func.count(HedgeLeg.id)).where(
+                HedgeLeg.market_id == m.id, HedgeLeg.status == models.LEG_ACTIVE
+            )
+        ) or 0
+        leg_exposure = session.scalar(
+            select(func.coalesce(func.sum(HedgeLeg.covered_loss), 0.0)).where(
+                HedgeLeg.market_id == m.id, HedgeLeg.status == models.LEG_ACTIVE
+            )
+        ) or 0.0
+        count = int(pol_count) + int(leg_count)
+        exposure = float(pol_exposure) + float(leg_exposure)
         item = AdminMarketOut(
             id=m.id,
             provider=m.provider,
@@ -64,6 +76,8 @@ def resolve(req: ResolveRequest, session: Session = Depends(get_session)):
         outcome=result.outcome,
         policies_paid=result.policies_paid,
         policies_expired=result.policies_expired,
+        legs_paid=result.legs_paid,
+        legs_expired=result.legs_expired,
         total_payout=round(result.total_payout, 2),
         pool_after=pool,
     )

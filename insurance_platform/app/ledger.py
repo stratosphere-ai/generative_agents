@@ -33,10 +33,15 @@ def post(
     amount: float,
     policy_id: int | None = None,
     memo: str = "",
+    basket_policy_id: int | None = None,
 ) -> LedgerEntry:
     """Append a journal entry. Does not commit — caller controls the transaction."""
     entry = LedgerEntry(
-        entry_type=entry_type, amount=amount, policy_id=policy_id, memo=memo
+        entry_type=entry_type,
+        amount=amount,
+        policy_id=policy_id,
+        basket_policy_id=basket_policy_id,
+        memo=memo,
     )
     session.add(entry)
     session.flush()

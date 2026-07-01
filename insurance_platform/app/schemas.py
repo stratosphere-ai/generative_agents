@@ -83,5 +83,80 @@ class ResolveResponse(BaseModel):
     outcome: str
     policies_paid: int
     policies_expired: int
+    legs_paid: int = 0
+    legs_expired: int = 0
     total_payout: float
     pool_after: PoolOut
+
+
+# --- Cargo basket (shipment) product ---
+
+class ShipmentQuoteRequest(BaseModel):
+    cargo_value: float = Field(gt=0, description="Insured value of the cargo, e.g. 400000")
+    origin: str
+    destination: str
+    deadline: datetime | None = None
+    cargo_type: str | None = None
+    route: str | None = None
+
+
+class FactorOut(BaseModel):
+    key: str
+    label: str
+    category: str
+    probability: float
+    impact: float
+    covered_loss: float
+    expected_loss: float
+    hedge_cost: float
+    premium: float
+
+
+class ShipmentQuoteResponse(BaseModel):
+    cargo_value: float
+    origin: str
+    destination: str
+    loading_factor: float
+    premium: float
+    total_covered: float
+    expected_loss_total: float
+    factor_count: int
+    factors: list[FactorOut]
+
+
+class BasketBuyResponse(BaseModel):
+    policy_id: int
+    premium: float
+    total_covered: float
+    factor_count: int
+    status: str
+    pool_after: PoolOut
+
+
+class HedgeLegOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    factor_key: str
+    factor_label: str
+    category: str
+    impact: float
+    covered_loss: float
+    probability_at_purchase: float
+    premium: float
+    status: str
+
+
+class BasketPolicyOut(BaseModel):
+    id: int
+    premium: float
+    total_covered: float
+    total_reserve: float
+    status: str
+    created_at: datetime
+    cargo_value: float
+    origin: str
+    destination: str
+    deadline: datetime | None = None
+    cargo_type: str | None = None
+    legs: list[HedgeLegOut]

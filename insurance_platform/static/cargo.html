@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>货运投保 · Cargo Insurance</title>
+  <link rel="stylesheet" href="/styles.css" />
+  <style>
+    .layout { display: grid; grid-template-columns: 360px 1fr; gap: 24px; }
+    @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+    .form-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px; }
+    .form-card label { display:block; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing:.04em; margin: 12px 0 4px; }
+    .form-card input { width:100%; background: var(--card2); border:1px solid var(--border); color:var(--text); border-radius:8px; padding:10px 12px; font-size:14px; }
+    .form-card button { width:100%; margin-top:18px; padding:12px; font-size:15px; }
+    .totline { display:flex; justify-content:space-between; align-items:baseline; padding:10px 0; border-bottom:1px solid var(--border); }
+    .totline .big { font-size:26px; font-weight:800; color:var(--accent); }
+    .cat { padding:2px 8px; border-radius:999px; font-size:11px; font-weight:700; }
+    .cat.route{background:#1d3a5f;color:#8fbaff;} .cat.geopolitical{background:#3a2020;color:#f0a0a0;}
+    .cat.macro{background:#2a2440;color:#c3b0f0;} .cat.weather{background:#14432a;color:#6ee7a8;}
+    .hint{color:var(--muted);font-size:12px;margin-top:6px;}
+    details.pol{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px;}
+    details.pol summary{cursor:pointer;font-weight:600;}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">Pred<span>Insure</span> · 预测市场保险</div>
+    <nav>
+      <a href="/cargo.html" class="active">货运投保 Cargo</a>
+      <a href="/">单事件 Markets</a>
+      <a href="/policies.html">保单 Policies</a>
+      <a href="/admin.html">Admin</a>
+    </nav>
+  </header>
+  <main>
+    <h1>货运保单 · 一键对冲一篮子风险</h1>
+    <p class="subtitle">填写货运信息，引擎自动分析航道/地缘/宏观/天气因子，映射到预测市场盘口进行对冲。你只交一笔保费。</p>
+
+    <div id="pool" class="pool-bar"></div>
+
+    <div class="layout">
+      <div class="form-card">
+        <h3 style="margin-top:0">货运信息</h3>
+        <label>货值 Cargo value (USD)</label>
+        <input id="cargo_value" type="number" min="1" step="10000" value="400000" />
+        <label>起点 Origin</label>
+        <input id="origin" type="text" value="Shanghai" />
+        <label>终点 Destination</label>
+        <input id="destination" type="text" value="Rotterdam (Europe)" />
+        <label>货物类型 Cargo type</label>
+        <input id="cargo_type" type="text" value="electronics" />
+        <label>截止日期 Deadline</label>
+        <input id="deadline" type="date" value="2026-09-30" />
+        <button id="analyze">分析并报价</button>
+        <div class="hint">Route 关键词（Suez / Panama / Asia / Europe / US…）会触发不同因子。</div>
+      </div>
+
+      <div>
+        <div id="quote"><div class="empty">填写左侧信息后点击「分析并报价」。</div></div>
+        <div id="mypolicies" style="margin-top:28px"></div>
+      </div>
+    </div>
+  </main>
+
+  <script src="/app.js"></script>
+  <script>
+    function body() {
+      return {
+        cargo_value: Number(document.getElementById("cargo_value").value),
+        origin: document.getElementById("origin").value,
+        destination: document.getElementById("destination").value,
+        cargo_type: document.getElementById("cargo_type").value,
+        deadline: document.getElementById("deadline").value
+          ? new Date(document.getElementById("deadline").value).toISOString() : null,
+      };
+    }
+
+    async function analyze() {
+      const q = document.getElementById("quote");
+      q.innerHTML = `<div class="empty">分析中…</div>`;
+      try {
+        const r = await api("/api/shipments/quote", { method: "POST", body: JSON.stringify(body()) });
+        let rows = "";
+        for (const f of r.factors) {
+          rows += `<tr>
+            <td><span class="cat ${f.category}">${f.category}</span></td>
+            <td>${f.label}</td>
+            <td>${pct(f.probability)}</td>
+            <td>${(f.impact*100).toFixed(0)}%</td>
+            <td>${money(f.covered_loss)}</td>
+            <td>${money(f.premium)}</td></tr>`;
+        }
+        q.innerHTML = `
+          <div class="card">
+            <div class="totline"><div>本单总保费 Premium <span class="hint">(含 ${(r.loading_factor*100).toFixed(0)}% 加成)</span></div><div class="big">${money(r.premium)}</div></div>
+            <div class="totline"><div>覆盖损失敞口 Covered loss</div><div>${money(r.total_covered)}</div></div>
+            <div class="totline"><div>期望损失 Expected loss</div><div>${money(r.expected_loss_total)}</div></div>
+            <div class="totline" style="border:none"><div>对冲因子数 Factors</div><div>${r.factor_count}</div></div>
+            <table style="margin-top:14px"><thead><tr><th>类别</th><th>因子</th><th>概率</th><th>影响</th><th>覆盖</th><th>保费</th></tr></thead><tbody>${rows}</tbody></table>
+            <button id="buy" style="margin-top:16px">一键投保 · 交 ${money(r.premium)}</button>
+          </div>`;
+        document.getElementById("buy").onclick = () => buy(r.premium);
+      } catch (e) {
+        q.innerHTML = `<div class="empty">报价失败: ${e.message}</div>`;
+      }
+    }
+
+    async function buy(premium) {
+      try {
+        const r = await api("/api/shipments/policies", { method: "POST", body: JSON.stringify(body()) });
+        toast(`保单 #${r.policy_id} 已生效 · 保费 ${money(r.premium)} · ${r.factor_count} 条对冲腿`, "ok");
+        renderPoolBar("pool");
+        loadPolicies();
+      } catch (e) {
+        if (e.status === 409) toast("资金池偿付能力不足，无法承保。", "err");
+        else toast("投保失败: " + e.message, "err");
+      }
+    }
+
+    async function loadPolicies() {
+      const el = document.getElementById("mypolicies");
+      try {
+        const pols = await api("/api/shipments/policies");
+        if (!pols.length) { el.innerHTML = ""; return; }
+        let html = `<h3>我的货运保单</h3>`;
+        for (const p of pols) {
+          let legs = "";
+          for (const l of p.legs) {
+            legs += `<tr><td><span class="cat ${l.category}">${l.category}</span></td><td>${l.factor_label}</td>
+              <td>${pct(l.probability_at_purchase)}</td><td>${money(l.covered_loss)}</td>
+              <td><span class="badge ${l.status}">${l.status.replace(/_/g," ")}</span></td></tr>`;
+          }
+          html += `<details class="pol">
+            <summary>#${p.id} ${p.origin} → ${p.destination} · 货值 ${money(p.cargo_value)} · 保费 ${money(p.premium)}
+              <span class="badge ${p.status}">${p.status.replace(/_/g," ")}</span></summary>
+            <table style="margin-top:10px"><thead><tr><th>类别</th><th>因子</th><th>概率</th><th>覆盖</th><th>状态</th></tr></thead><tbody>${legs}</tbody></table>
+          </details>`;
+        }
+        el.innerHTML = html;
+      } catch (e) { el.innerHTML = ""; }
+    }
+
+    document.getElementById("analyze").onclick = analyze;
+    renderPoolBar("pool");
+    loadPolicies();
+  </script>
+</body>
+</html>
