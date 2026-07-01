@@ -22,9 +22,11 @@ logger = logging.getLogger(__name__)
 
 
 class MarketMatcher:
-    def __init__(self, providers: list[MarketProvider], min_score: float) -> None:
+    def __init__(self, providers: list[MarketProvider], min_score: float,
+                 min_liquidity: float = 0.0) -> None:
         self.providers = providers
         self.min_score = min_score
+        self.min_liquidity = min_liquidity
         self.enabled = bool(providers)
 
     def _candidates(self, query: str) -> list[ScoredMarket]:
@@ -37,14 +39,21 @@ class MarketMatcher:
         return cands
 
     def match(self, factor) -> Optional[tuple[MarketData, str]]:
-        """Return (market, provider_name) for the best match, or None."""
+        """Pick the most *liquid* relevant book (hot-book selection).
+
+        Keep only candidates that clear both the relevance floor (keyword score)
+        and the liquidity floor, then prefer the deepest book so the hedge can
+        actually be filled; break ties by relevance. This is what guarantees we
+        bet on liquid markets rather than the closest-worded thin one.
+        """
         query = getattr(factor, "search_query", None) or getattr(factor, "label", "")
-        best = None
-        for cand in self._candidates(query):
-            if cand.score >= self.min_score and (best is None or cand.score > best.score):
-                best = cand
-        if best is None:
+        eligible = [
+            c for c in self._candidates(query)
+            if c.score >= self.min_score and c.liquidity >= self.min_liquidity
+        ]
+        if not eligible:
             return None
+        best = max(eligible, key=lambda c: (c.liquidity, c.score))
         return best.market, best.provider
 
 
@@ -57,11 +66,11 @@ _PROVIDER_BUILDERS = {
 def get_matcher() -> MarketMatcher:
     """Build the matcher from config; disabled (no providers) when INSURE_MATCH=off."""
     if settings.match != "on":
-        return MarketMatcher([], settings.match_min_score)
+        return MarketMatcher([], settings.match_min_score, settings.match_min_liquidity)
     providers = []
     for name in settings.match_providers.split(","):
         name = name.strip().lower()
         builder = _PROVIDER_BUILDERS.get(name)
         if builder:
             providers.append(builder())
-    return MarketMatcher(providers, settings.match_min_score)
+    return MarketMatcher(providers, settings.match_min_score, settings.match_min_liquidity)

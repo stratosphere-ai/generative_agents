@@ -14,6 +14,7 @@ class MarketData(TypedDict):
     probability: float  # YES-implied probability, in (0, 1)
     end_date: Optional[str]  # ISO8601 or None
     status: str  # "open" | "resolved_yes" | "resolved_no" | "closed"
+    liquidity: float  # volume / open-interest proxy in provider units (0 if unknown)
     raw: dict[str, Any]
 
 
@@ -44,6 +45,7 @@ class ScoredMarket:
     market: "MarketData"
     score: float
     provider: str
+    liquidity: float = 0.0
 
 
 class MarketProvider(ABC):
@@ -76,6 +78,9 @@ class MarketProvider(ABC):
                 continue
             score = _overlap_score(query_tokens, md.get("question", ""))
             if score > 0:
-                scored.append(ScoredMarket(market=md, score=score, provider=self.name))
+                scored.append(ScoredMarket(
+                    market=md, score=score, provider=self.name,
+                    liquidity=float(md.get("liquidity", 0) or 0),
+                ))
         scored.sort(key=lambda s: s.score, reverse=True)
         return scored

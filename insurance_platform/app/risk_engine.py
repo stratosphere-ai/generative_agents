@@ -120,6 +120,8 @@ class FactorAssessment:
     source: str = "rule"           # factor discovery source: "rule" | "llm"
     market_provider: str = "engine"  # book source: "engine"(synthetic)|"polymarket"|"kalshi"
     market_matched: bool = False   # True if mapped to a real order book
+    hedge_shares: float = 0.0      # YES shares actually hedged (<= covered_loss if depth-capped)
+    market_liquidity: float = 0.0  # matched book liquidity (0 for synthetic books)
 
 
 def _relevant(template, haystack):
@@ -171,6 +173,7 @@ def analyze(shipment_like, cargo_value, loading_factor):
                 premium=premium,
                 market_external_id="factor-" + t.key,
                 market_question=t.label + "?",
+                hedge_shares=covered,
             )
         )
     return out

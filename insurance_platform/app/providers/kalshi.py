@@ -23,6 +23,17 @@ logger = logging.getLogger(__name__)
 KALSHI_URL = "https://api.elections.kalshi.com/trade-api/v2/markets"
 
 
+def _num(*candidates) -> float:
+    for c in candidates:
+        if c is None:
+            continue
+        try:
+            return float(c)
+        except (ValueError, TypeError):
+            continue
+    return 0.0
+
+
 def _probability(raw: dict[str, Any]) -> Optional[float]:
     bid, ask = raw.get("yes_bid"), raw.get("yes_ask")
     try:
@@ -69,6 +80,8 @@ def _to_market_data(raw: dict[str, Any]) -> Optional[MarketData]:
         probability=prob,
         end_date=raw.get("close_time") or raw.get("expiration_time"),
         status=_status(raw, prob),
+        liquidity=_num(raw.get("open_interest"), raw.get("volume"),
+                       raw.get("liquidity"), raw.get("dollar_open_interest")),
         raw=raw,
     )
 

@@ -49,6 +49,11 @@ class Settings:
     match: str = os.environ.get("INSURE_MATCH", "off").lower()
     match_providers: str = os.environ.get("INSURE_MATCH_PROVIDERS", "polymarket,kalshi")
     match_min_score: float = _get_float("INSURE_MATCH_MIN_SCORE", 0.34)
+    # Skip books thinner than this (liquidity/volume, provider units) when matching.
+    match_min_liquidity: float = _get_float("INSURE_MATCH_MIN_LIQUIDITY", 5000.0)
+    # Cap a factor's hedge at this fraction of the matched book's liquidity so we
+    # don't move the market; the un-hedged remainder is retained (basis) risk.
+    hedge_depth_fraction: float = _get_float("INSURE_HEDGE_DEPTH_FRACTION", 0.10)
 
 
 settings = Settings()

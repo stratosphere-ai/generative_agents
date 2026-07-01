@@ -67,6 +67,13 @@
     function srcLabel(s) {
       return s === "llm" ? '<span class="cat macro">LLM</span>' : '<span class="cat route">规则</span>';
     }
+    function hedgeLabel(f) {
+      const cov = f.covered_loss || 0, h = (f.hedge_shares != null ? f.hedge_shares : cov);
+      if (!cov) return "—";
+      const r = Math.round((h / cov) * 100);
+      if (r >= 100) return '<span class="cat weather">100%</span>';
+      return `<span class="cat geopolitical" title="盘口深度不足，剩余为自留风险">${r}%</span>`;
+    }
     function provLabel(p, matched) {
       if (p === "polymarket") return '<span class="cat weather">Polymarket</span>';
       if (p === "kalshi") return '<span class="cat weather">Kalshi</span>';
@@ -98,7 +105,8 @@
             <td>${(f.impact*100).toFixed(0)}%</td>
             <td>${money(f.covered_loss)}</td>
             <td>${money(f.premium)}</td>
-            <td>${provLabel(f.market_provider, f.matched)}</td></tr>`;
+            <td>${provLabel(f.market_provider, f.matched)}</td>
+            <td>${hedgeLabel(f)}</td></tr>`;
         }
         q.innerHTML = `
           <div class="card">
@@ -107,7 +115,7 @@
             <div class="totline"><div>期望损失 Expected loss</div><div>${money(r.expected_loss_total)}</div></div>
             <div class="totline"><div>因子发现引擎 Discovery</div><div>${srcLabel(r.discovery_mode)}</div></div>
             <div class="totline" style="border:none"><div>对冲因子 Factors <span class="hint">(${r.matched_count} 个匹配真实盘口)</span></div><div>${r.factor_count}</div></div>
-            <table style="margin-top:14px"><thead><tr><th>类别</th><th>因子</th><th>概率</th><th>影响</th><th>覆盖</th><th>保费</th><th>盘口来源</th></tr></thead><tbody>${rows}</tbody></table>
+            <table style="margin-top:14px"><thead><tr><th>类别</th><th>因子</th><th>概率</th><th>影响</th><th>覆盖</th><th>保费</th><th>盘口来源</th><th>对冲</th></tr></thead><tbody>${rows}</tbody></table>
             <button id="buy" style="margin-top:16px">一键投保 · 交 ${money(r.premium)}</button>
           </div>`;
         document.getElementById("buy").onclick = () => buy(r.premium);

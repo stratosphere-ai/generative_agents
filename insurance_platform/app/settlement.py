@@ -173,7 +173,7 @@ def underwrite_basket(
             covered_loss=a.covered_loss,
             probability_at_purchase=a.probability,
             premium=a.premium,
-            hedge_shares=a.covered_loss,
+            hedge_shares=(getattr(a, "hedge_shares", 0.0) or a.covered_loss),
             hedge_price=a.probability,
             source=getattr(a, "source", "rule"),
             status=models.LEG_ACTIVE,

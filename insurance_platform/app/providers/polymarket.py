@@ -23,6 +23,18 @@ logger = logging.getLogger(__name__)
 GAMMA_URL = "https://gamma-api.polymarket.com/markets"
 
 
+def _num(*candidates) -> float:
+    """First castable-to-float candidate, else 0.0."""
+    for c in candidates:
+        if c is None:
+            continue
+        try:
+            return float(c)
+        except (ValueError, TypeError):
+            continue
+    return 0.0
+
+
 def _loads_list(value: Any) -> list:
     """Parse a field that may be a JSON-encoded string or already a list."""
     if value is None:
@@ -103,6 +115,8 @@ def _to_market_data(raw: dict[str, Any]) -> Optional[MarketData]:
         probability=prob,
         end_date=raw.get("endDate"),
         status=_status(raw, prob),
+        liquidity=_num(raw.get("liquidityNum"), raw.get("liquidity"),
+                       raw.get("volumeNum"), raw.get("volume")),
         raw=raw,
     )
 

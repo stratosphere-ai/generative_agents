@@ -17,6 +17,7 @@ _SEED: list[MarketData] = [
         "probability": 0.28,
         "end_date": "2026-09-30T23:59:59Z",
         "status": "open",
+        "liquidity": 50000,
         "raw": {},
     },
     {
@@ -26,6 +27,7 @@ _SEED: list[MarketData] = [
         "probability": 0.42,
         "end_date": "2026-07-05T00:00:00Z",
         "status": "open",
+        "liquidity": 50000,
         "raw": {},
     },
     {
@@ -35,6 +37,7 @@ _SEED: list[MarketData] = [
         "probability": 0.18,
         "end_date": "2026-07-31T23:59:59Z",
         "status": "open",
+        "liquidity": 50000,
         "raw": {},
     },
     {
@@ -44,6 +47,7 @@ _SEED: list[MarketData] = [
         "probability": 0.35,
         "end_date": "2026-08-31T23:59:59Z",
         "status": "open",
+        "liquidity": 50000,
         "raw": {},
     },
     {
@@ -53,6 +57,7 @@ _SEED: list[MarketData] = [
         "probability": 0.55,
         "end_date": "2026-07-12T18:00:00Z",
         "status": "open",
+        "liquidity": 50000,
         "raw": {},
     },
     {
@@ -62,6 +67,7 @@ _SEED: list[MarketData] = [
         "probability": 0.50,
         "end_date": "2026-07-15T00:00:00Z",
         "status": "open",
+        "liquidity": 50000,
         "raw": {},
     },
 ]

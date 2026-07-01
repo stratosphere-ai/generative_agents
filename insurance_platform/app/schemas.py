@@ -114,6 +114,8 @@ class FactorOut(BaseModel):
     source: str = "rule"            # discovery source: rule | llm
     market_provider: str = "engine"  # engine | polymarket | kalshi
     matched: bool = False            # mapped to a real order book?
+    market_liquidity: float = 0.0    # matched book liquidity (0 for synthetic)
+    hedge_shares: float = 0.0        # YES shares actually hedged (<= covered if depth-capped)
 
 
 class ShipmentQuoteResponse(BaseModel):

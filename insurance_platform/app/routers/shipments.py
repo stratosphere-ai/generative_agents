@@ -55,6 +55,8 @@ def quote(req: ShipmentQuoteRequest):
             covered_loss=round(a.covered_loss, 2), expected_loss=round(a.expected_loss, 2),
             hedge_cost=round(a.hedge_cost, 2), premium=round(a.premium, 2),
             source=a.source, market_provider=a.market_provider, matched=a.market_matched,
+            market_liquidity=round(a.market_liquidity, 2),
+            hedge_shares=round(a.hedge_shares, 2),
         )
         for a in assessments
     ]

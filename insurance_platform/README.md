@@ -197,3 +197,30 @@ A `render.yaml` blueprint is included. To get a public `https://…` link (works
 It deploys keyless (auto-falls back to mock/rule). To enable the intelligent path,
 set `ANTHROPIC_API_KEY`, `INSURE_DISCOVERY=llm`, `INSURE_MATCH=on` in the Render
 dashboard. The same `Dockerfile` also works on Railway, Fly.io, or any container host.
+
+## Liquidity-first hot-book selection (hedge, not arbitrage)
+
+When real matching is on (`INSURE_MATCH=on`), the engine doesn't just pick the
+closest-worded book — it picks the most **liquid** relevant one and sizes the
+hedge to the book's depth:
+
+- **Hot-book selection** (`app/matching.py`): candidates must clear both a
+  relevance floor (`INSURE_MATCH_MIN_SCORE`) and a **liquidity floor**
+  (`INSURE_MATCH_MIN_LIQUIDITY`); among those, the **deepest** book wins (ties
+  broken by relevance). Thin books are skipped, so hedges can actually be filled.
+- **Depth-capped hedge** (`app/engine.py`): a factor's hedge is capped at
+  `INSURE_HEDGE_DEPTH_FRACTION × book_liquidity` so the order can't move the
+  market; any un-hedged remainder is **retained (basis) risk**, surfaced in the
+  quote as a sub-100% "对冲" ratio. This cap is the core "**hedge, not
+  arbitrage**" guardrail — positions are sized to replicate the insured loss and
+  never exceed what the book can absorb.
+
+Liquidity comes from each provider (`liquidityNum`/`volumeNum` on Polymarket,
+`open_interest`/`volume` on Kalshi). With `INSURE_MATCH=off` (default) factors use
+a fully-hedged synthetic book, so the offline demo is unchanged.
+
+| Var | Default | Meaning |
+|---|---|---|
+| `INSURE_MATCH_MIN_SCORE` | `0.34` | min keyword-relevance to consider a book |
+| `INSURE_MATCH_MIN_LIQUIDITY` | `5000` | skip books thinner than this |
+| `INSURE_HEDGE_DEPTH_FRACTION` | `0.10` | cap a hedge at this fraction of book liquidity |
