@@ -5,3 +5,4 @@ pydantic>=2.6
 SQLAlchemy>=2.0
 python-dateutil>=2.8
 pytest>=8.0
+anthropic>=0.40   # LLM factor discovery (P2); optional at runtime

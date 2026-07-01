@@ -38,5 +38,17 @@ class Settings:
     # HTTP timeout (seconds) for the real market provider.
     http_timeout: float = _get_float("INSURE_HTTP_TIMEOUT", 6.0)
 
+    # --- P2: factor discovery + real order-book matching ---
+    # Factor discovery: "rule" (deterministic templates) or "llm" (Claude, auto-
+    # falls back to rule on any error).
+    discovery: str = os.environ.get("INSURE_DISCOVERY", "rule").lower()
+    # Model used for LLM discovery.
+    llm_model: str = os.environ.get("INSURE_LLM_MODEL", "claude-opus-4-8")
+    # Real order-book matching: "off" (synthesize engine books) or "on" (match
+    # against real Polymarket/Kalshi books; falls back to synthetic per factor).
+    match: str = os.environ.get("INSURE_MATCH", "off").lower()
+    match_providers: str = os.environ.get("INSURE_MATCH_PROVIDERS", "polymarket,kalshi")
+    match_min_score: float = _get_float("INSURE_MATCH_MIN_SCORE", 0.34)
+
 
 settings = Settings()

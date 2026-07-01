@@ -137,3 +137,39 @@ order-book depth/slippage are deferred to later phases (see the roadmap).
 - **P1 (done):** basket data model, rule-based engine, portfolio premium/solvency, cargo UI.
 - **P2:** LLM-based factor *discovery* + real order-book mapping (multi-provider).
 - **P3:** factor correlation & joint-loss model, basis-risk capital, CLOB depth/slippage, parametric delivery oracle for claims.
+
+## Intelligent engine (P2) — LLM factor discovery + real order-book matching
+
+P1's engine used a fixed factor template and synthetic books. P2 makes it
+intelligent and connects it to real markets — the buyer experience is unchanged.
+
+- **Factor discovery** (`app/discovery.py`, `app/llm.py`): `INSURE_DISCOVERY=llm`
+  uses **Claude** (official `anthropic` SDK, `claude-opus-4-8`, structured JSON
+  output) to read the shipment and propose material risk factors. Any failure
+  (no key, blocked network, bad output) **auto-falls back** to the P1 rule
+  engine (`FallbackDiscovery`), so the app never breaks. Default `rule`.
+- **Real multi-provider matching** (`app/matching.py`, `app/providers/kalshi.py`):
+  `INSURE_MATCH=on` maps each factor to a real prediction-market book across
+  **Polymarket + Kalshi** (`search_markets` + keyword scoring), and prices the
+  hedge at the real book's probability. Unmatched factors keep a synthetic
+  `engine` book. Providers are called defensively, so a blocked provider just
+  yields no match. Default `off`.
+- **Orchestration** (`app/engine.py`): `assess()` = discover → match → price.
+  The API and cargo UI surface each factor's **discovery source** (LLM / 规则)
+  and **盘口来源** (Polymarket / Kalshi / 合成).
+
+| Var | Default | Meaning |
+|---|---|---|
+| `INSURE_DISCOVERY` | `rule` | `rule` or `llm` (Claude, auto-fallback) |
+| `INSURE_LLM_MODEL` | `claude-opus-4-8` | model for LLM discovery |
+| `INSURE_MATCH` | `off` | `off` (synthetic books) or `on` (real Polymarket/Kalshi) |
+| `INSURE_MATCH_PROVIDERS` | `polymarket,kalshi` | providers to search when matching |
+
+Enable the intelligent path where it can reach the services:
+```bash
+export ANTHROPIC_API_KEY=sk-...        # for INSURE_DISCOVERY=llm
+INSURE_DISCOVERY=llm INSURE_MATCH=on ./run.sh
+```
+Both paths degrade gracefully, so this sandbox (no key, Polymarket/Kalshi
+blocked) runs `rule` + synthetic; the LLM/real-match code is exercised in tests
+via mocks (`tests/test_discovery.py`, `test_matching.py`, `test_engine.py`).

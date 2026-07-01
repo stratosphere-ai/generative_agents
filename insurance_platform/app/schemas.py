@@ -110,6 +110,9 @@ class FactorOut(BaseModel):
     expected_loss: float
     hedge_cost: float
     premium: float
+    source: str = "rule"            # discovery source: rule | llm
+    market_provider: str = "engine"  # engine | polymarket | kalshi
+    matched: bool = False            # mapped to a real order book?
 
 
 class ShipmentQuoteResponse(BaseModel):
@@ -121,6 +124,8 @@ class ShipmentQuoteResponse(BaseModel):
     total_covered: float
     expected_loss_total: float
     factor_count: int
+    discovery_mode: str = "rule"     # rule | llm
+    matched_count: int = 0           # factors mapped to a real book
     factors: list[FactorOut]
 
 
@@ -144,6 +149,8 @@ class HedgeLegOut(BaseModel):
     covered_loss: float
     probability_at_purchase: float
     premium: float
+    source: str = "rule"
+    market_provider: str = "engine"
     status: str
 
 

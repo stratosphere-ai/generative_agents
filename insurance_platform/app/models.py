@@ -177,6 +177,7 @@ class HedgeLeg(Base):
     premium: Mapped[float] = mapped_column(Float)  # leg's share of the premium
     hedge_shares: Mapped[float] = mapped_column(Float)  # = covered_loss
     hedge_price: Mapped[float] = mapped_column(Float)  # = probability
+    source: Mapped[str] = mapped_column(String(16), default="rule")  # discovery: rule|llm
     status: Mapped[str] = mapped_column(String(24), default=LEG_ACTIVE)
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 

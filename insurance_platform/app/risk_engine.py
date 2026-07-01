@@ -117,6 +117,9 @@ class FactorAssessment:
     premium: float          # covered_loss * probability * (1 + loading)
     market_external_id: str
     market_question: str
+    source: str = "rule"           # factor discovery source: "rule" | "llm"
+    market_provider: str = "engine"  # book source: "engine"(synthetic)|"polymarket"|"kalshi"
+    market_matched: bool = False   # True if mapped to a real order book
 
 
 def _relevant(template, haystack):

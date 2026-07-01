@@ -1,8 +1,10 @@
 """Cargo insurance: analyze a shipment, one-click buy a basket policy, list them.
 
 The buyer's experience is unchanged from the single-event product — submit the
-shipment, see one premium, click once. The engine fans the shipment out into a
-hedged portfolio of risk factors behind the scenes.
+shipment, see one premium, click once. The engine (discovery -> real-book
+matching -> pricing) fans the shipment out into a hedged portfolio behind the
+scenes; the responses expose which factors came from the LLM vs the rule engine
+and which were mapped to a real order book.
 """
 from __future__ import annotations
 
@@ -12,7 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .. import risk_engine, settlement
+from .. import engine, settlement
 from ..config import settings
 from ..db import get_session
 from ..deps import get_demo_user, pool_snapshot
@@ -35,8 +37,9 @@ def _assess(req: ShipmentQuoteRequest):
         destination=req.destination,
         route=req.route,
         cargo_type=req.cargo_type,
+        deadline=req.deadline,
     )
-    return risk_engine.analyze(shipment_like, req.cargo_value, settings.loading_factor)
+    return engine.assess(shipment_like, req.cargo_value, settings.loading_factor)
 
 
 @router.post("/quote", response_model=ShipmentQuoteResponse)
@@ -51,6 +54,7 @@ def quote(req: ShipmentQuoteRequest):
             probability=round(a.probability, 4), impact=a.impact,
             covered_loss=round(a.covered_loss, 2), expected_loss=round(a.expected_loss, 2),
             hedge_cost=round(a.hedge_cost, 2), premium=round(a.premium, 2),
+            source=a.source, market_provider=a.market_provider, matched=a.market_matched,
         )
         for a in assessments
     ]
@@ -63,6 +67,8 @@ def quote(req: ShipmentQuoteRequest):
         total_covered=round(sum(a.covered_loss for a in assessments), 2),
         expected_loss_total=round(sum(a.expected_loss for a in assessments), 2),
         factor_count=len(assessments),
+        discovery_mode=assessments[0].source,
+        matched_count=sum(1 for a in assessments if a.market_matched),
         factors=factors,
     )
 
@@ -123,6 +129,11 @@ def my_basket_policies(session: Session = Depends(get_session)):
     out = []
     for p in rows:
         sh = p.shipment
+        legs = []
+        for l in p.legs:
+            item = HedgeLegOut.model_validate(l)
+            item.market_provider = l.market.provider if l.market else "engine"
+            legs.append(item)
         out.append(
             BasketPolicyOut(
                 id=p.id,
@@ -136,7 +147,7 @@ def my_basket_policies(session: Session = Depends(get_session)):
                 destination=sh.destination,
                 deadline=sh.deadline,
                 cargo_type=sh.cargo_type,
-                legs=[HedgeLegOut.model_validate(l) for l in p.legs],
+                legs=legs,
             )
         )
     session.commit()

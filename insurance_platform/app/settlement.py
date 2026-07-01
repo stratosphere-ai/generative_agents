@@ -95,18 +95,21 @@ def underwrite_policy(
 def _upsert_factor_market(session: Session, assessment) -> Market:
     """Get/create the synthetic 'order book' Market backing a risk factor.
 
-    In P1 factor books are engine-provided (provider='engine'); the same factor
-    across shipments reuses one Market row so resolving it settles every leg.
+    The book's provider is the assessment's market_provider ('engine' for a
+    synthetic P1 book, or 'polymarket'/'kalshi' when matched to a real book).
+    The same factor across shipments reuses one Market row so resolving it
+    settles every leg.
     """
+    provider = getattr(assessment, "market_provider", "engine")
     market = session.scalar(
         select(Market).where(
-            Market.provider == "engine",
+            Market.provider == provider,
             Market.external_id == assessment.market_external_id,
         )
     )
     if market is None:
         market = Market(
-            provider="engine",
+            provider=provider,
             external_id=assessment.market_external_id,
             question=assessment.market_question,
             probability=assessment.probability,
@@ -172,6 +175,7 @@ def underwrite_basket(
             premium=a.premium,
             hedge_shares=a.covered_loss,
             hedge_price=a.probability,
+            source=getattr(a, "source", "rule"),
             status=models.LEG_ACTIVE,
         )
         session.add(leg)
