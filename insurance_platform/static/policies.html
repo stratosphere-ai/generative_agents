@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>My Policies · 我的保单</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header>
+    <div class="brand">Pred<span>Insure</span> · 预测市场保险</div>
+    <nav>
+      <a href="/">投保 Browse</a>
+      <a href="/policies.html" class="active">我的保单 Policies</a>
+      <a href="/admin.html">Admin</a>
+    </nav>
+  </header>
+  <main>
+    <h1>我的保单 · My Policies</h1>
+    <p class="subtitle">Every policy you have bought, with the price paid and current status.</p>
+    <div id="wrap"><div class="empty">Loading…</div></div>
+  </main>
+
+  <script src="/app.js"></script>
+  <script>
+    async function load() {
+      const wrap = document.getElementById("wrap");
+      try {
+        const rows = await api("/api/policies");
+        if (!rows.length) { wrap.innerHTML = `<div class="empty">No policies yet. <a href="/">Buy one →</a></div>`; return; }
+        let html = `<table><thead><tr>
+          <th>#</th><th>Event</th><th>Coverage</th><th>Premium</th><th>Prob @ Buy</th><th>Status</th><th>Bought</th></tr></thead><tbody>`;
+        for (const p of rows) {
+          html += `<tr>
+            <td>${p.id}</td>
+            <td>${p.question || "market #" + p.market_id}</td>
+            <td>${money(p.coverage)}</td>
+            <td>${money(p.premium)}</td>
+            <td>${pct(p.probability_at_purchase)}</td>
+            <td><span class="badge ${p.status}">${p.status.replace(/_/g, " ")}</span></td>
+            <td>${fmtDate(p.created_at)}</td></tr>`;
+        }
+        html += `</tbody></table>`;
+        wrap.innerHTML = html;
+      } catch (e) {
+        wrap.innerHTML = `<div class="empty">Failed to load: ${e.message}</div>`;
+      }
+    }
+    load();
+  </script>
+</body>
+</html>

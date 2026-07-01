@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PredInsure · 预测市场保险</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header>
+    <div class="brand">Pred<span>Insure</span> · 预测市场保险</div>
+    <nav>
+      <a href="/" class="active">投保 Browse</a>
+      <a href="/policies.html">我的保单 Policies</a>
+      <a href="/admin.html">Admin</a>
+    </nav>
+  </header>
+  <main>
+    <h1>一键投保 · One-Click Insurance</h1>
+    <p class="subtitle">Premiums are priced from live prediction-market probabilities; each policy is backed by the matching market position (底层资产).</p>
+
+    <div id="pool" class="pool-bar"></div>
+
+    <div id="markets" class="grid"><div class="empty">Loading insurable events…</div></div>
+  </main>
+
+  <script src="/app.js"></script>
+  <script>
+    async function loadMarkets() {
+      const grid = document.getElementById("markets");
+      try {
+        const markets = await api("/api/markets?limit=50");
+        if (!markets.length) { grid.innerHTML = `<div class="empty">No open markets.</div>`; return; }
+        grid.innerHTML = "";
+        for (const m of markets) {
+          const card = document.createElement("div");
+          card.className = "card";
+          card.innerHTML = `
+            <div class="q">${m.question}</div>
+            <div class="desc">${m.description ? m.description.slice(0, 120) : ""}</div>
+            <div class="prob-row">
+              <div><div class="prob">${pct(m.probability)}</div><div class="prob-label">implied probability</div></div>
+              <div class="enddate">ends<br>${fmtDate(m.end_date)}</div>
+            </div>
+            <div class="buy-row">
+              <input type="number" min="1" step="100" value="1000" aria-label="coverage" />
+              <button>一键投保</button>
+            </div>`;
+          const input = card.querySelector("input");
+          const btn = card.querySelector("button");
+          btn.onclick = () => buy(m, Number(input.value));
+          grid.appendChild(card);
+        }
+      } catch (e) {
+        grid.innerHTML = `<div class="empty">Failed to load markets: ${e.message}</div>`;
+      }
+    }
+
+    async function buy(market, coverage) {
+      if (!coverage || coverage <= 0) { toast("Enter a coverage amount", "err"); return; }
+      try {
+        const q = await api("/api/quote", {
+          method: "POST",
+          body: JSON.stringify({ market_id: market.id, coverage }),
+        });
+        const ok = confirm(
+          `${market.question}\n\nCoverage: ${money(coverage)}\nImplied probability: ${pct(q.probability)}\nPremium (incl. ${(q.loading_factor*100).toFixed(0)}% margin): ${money(q.premium)}\n\nConfirm 一键投保?`
+        );
+        if (!ok) return;
+        const r = await api("/api/policies", {
+          method: "POST",
+          body: JSON.stringify({ market_id: market.id, coverage }),
+        });
+        toast(`Policy #${r.policy_id} issued · premium ${money(r.premium)}`, "ok");
+        renderPoolBar("pool");
+      } catch (e) {
+        if (e.status === 409) toast("Capital pool insolvent — cannot underwrite.", "err");
+        else toast("Purchase failed: " + e.message, "err");
+      }
+    }
+
+    renderPoolBar("pool");
+    loadMarkets();
+  </script>
+</body>
+</html>

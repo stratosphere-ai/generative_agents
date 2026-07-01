@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin · Resolution & Pool</title>
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header>
+    <div class="brand">Pred<span>Insure</span> · 预测市场保险</div>
+    <nav>
+      <a href="/">投保 Browse</a>
+      <a href="/policies.html">我的保单 Policies</a>
+      <a href="/admin.html" class="active">Admin</a>
+    </nav>
+  </header>
+  <main>
+    <h1>Admin · Resolution & Capital Pool</h1>
+    <p class="subtitle">Resolve an event to settle all active policies on it. YES pays out claims; NO expires them worthless.</p>
+
+    <div id="pool" class="pool-bar"></div>
+
+    <div id="wrap"><div class="empty">Loading…</div></div>
+  </main>
+
+  <script src="/app.js"></script>
+  <script>
+    async function load() {
+      const wrap = document.getElementById("wrap");
+      try {
+        const rows = await api("/api/admin/markets");
+        if (!rows.length) { wrap.innerHTML = `<div class="empty">No markets synced yet. Visit <a href="/">Browse</a> first.</div>`; return; }
+        let html = `<table><thead><tr>
+          <th>#</th><th>Event</th><th>Prob</th><th>Active</th><th>Exposure</th><th>Status</th><th>Resolve</th></tr></thead><tbody>`;
+        for (const m of rows) {
+          const controls = m.resolvable
+            ? `<div class="resolve-cell">
+                 <button class="ok" onclick="resolve(${m.id},'yes')">YES</button>
+                 <button class="danger" onclick="resolve(${m.id},'no')">NO</button>
+               </div>`
+            : `<span class="badge ${m.status}">${m.status.replace(/_/g," ")}</span>`;
+          html += `<tr>
+            <td>${m.id}</td>
+            <td>${m.question}</td>
+            <td>${pct(m.probability)}</td>
+            <td>${m.active_policies}</td>
+            <td>${money(m.total_exposure)}</td>
+            <td><span class="badge ${m.status}">${m.status.replace(/_/g," ")}</span></td>
+            <td>${controls}</td></tr>`;
+        }
+        html += `</tbody></table>`;
+        wrap.innerHTML = html;
+      } catch (e) {
+        wrap.innerHTML = `<div class="empty">Failed to load: ${e.message}</div>`;
+      }
+    }
+
+    async function resolve(marketId, outcome) {
+      if (!confirm(`Resolve market #${marketId} as ${outcome.toUpperCase()}? This settles all active policies.`)) return;
+      try {
+        const r = await api("/api/admin/resolve", {
+          method: "POST",
+          body: JSON.stringify({ market_id: marketId, outcome }),
+        });
+        toast(`Resolved ${outcome.toUpperCase()} · ${r.policies_paid} paid (${money(r.total_payout)}), ${r.policies_expired} expired`, "ok");
+        renderPoolBar("pool");
+        load();
+      } catch (e) {
+        toast("Resolve failed: " + e.message, "err");
+      }
+    }
+    window.resolve = resolve;
+
+    renderPoolBar("pool");
+    load();
+  </script>
+</body>
+</html>

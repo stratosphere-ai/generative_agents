@@ -1,0 +1,4 @@
+"""Pluggable prediction-market data providers."""
+from .factory import get_provider
+
+__all__ = ["get_provider"]
