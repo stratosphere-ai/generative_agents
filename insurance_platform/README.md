@@ -58,6 +58,8 @@ source of truth for pool balances; `CapitalPool` is a cache recomputed from it.
 
 ## Run
 
+Requires **Python 3.9+**.
+
 ```bash
 pip install -r requirements.txt
 ./run.sh                      # or: uvicorn app.main:app --reload --port 8100

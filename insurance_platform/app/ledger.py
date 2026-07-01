@@ -10,6 +10,7 @@ Sign convention (all amounts stored signed on LedgerEntry.amount):
     reserved_liabilities = sum(amount) over reserve_add + reserve_release entries
 """
 from __future__ import annotations
+from typing import Optional
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -31,9 +32,9 @@ def post(
     session: Session,
     entry_type: str,
     amount: float,
-    policy_id: int | None = None,
+    policy_id: Optional[int] = None,
     memo: str = "",
-    basket_policy_id: int | None = None,
+    basket_policy_id: Optional[int] = None,
 ) -> LedgerEntry:
     """Append a journal entry. Does not commit — caller controls the transaction."""
     entry = LedgerEntry(

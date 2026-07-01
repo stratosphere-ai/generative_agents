@@ -11,7 +11,7 @@ candidates and the factor falls back to a synthetic book.
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, Optional
 
 import httpx
 
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 KALSHI_URL = "https://api.elections.kalshi.com/trade-api/v2/markets"
 
 
-def _probability(raw: dict[str, Any]) -> float | None:
+def _probability(raw: dict[str, Any]) -> Optional[float]:
     bid, ask = raw.get("yes_bid"), raw.get("yes_ask")
     try:
         if bid is not None and ask is not None:
@@ -54,7 +54,7 @@ def _status(raw: dict[str, Any], probability: float) -> str:
     return "closed"
 
 
-def _to_market_data(raw: dict[str, Any]) -> MarketData | None:
+def _to_market_data(raw: dict[str, Any]) -> Optional[MarketData]:
     prob = _probability(raw)
     if prob is None:
         return None
@@ -96,7 +96,7 @@ class KalshiProvider(MarketProvider):
                 break
         return out
 
-    def get_market(self, external_id: str) -> MarketData | None:
+    def get_market(self, external_id: str) -> Optional[MarketData]:
         try:
             resp = httpx.get(f"{KALSHI_URL}/{external_id}", timeout=self._timeout)
             resp.raise_for_status()
@@ -105,7 +105,7 @@ class KalshiProvider(MarketProvider):
             return None
         return _to_market_data(raw)
 
-    def get_resolution(self, external_id: str) -> str | None:
+    def get_resolution(self, external_id: str) -> Optional[str]:
         md = self.get_market(external_id)
         if md is None:
             return None

@@ -5,6 +5,7 @@ network-blocked sandbox) and as the seed data for offline demos/tests. Includes
 one pre-resolvable market so the payout flow can be demonstrated end-to-end.
 """
 from __future__ import annotations
+from typing import Optional
 
 from .base import MarketData, MarketProvider
 
@@ -75,10 +76,10 @@ class MockProvider(MarketProvider):
     def list_markets(self, limit: int = 50) -> list[MarketData]:
         return [dict(m) for m in _SEED[:limit]]  # type: ignore[misc]
 
-    def get_market(self, external_id: str) -> MarketData | None:
+    def get_market(self, external_id: str) -> Optional[MarketData]:
         m = self._by_id.get(external_id)
         return dict(m) if m else None  # type: ignore[return-value]
 
-    def get_resolution(self, external_id: str) -> str | None:
+    def get_resolution(self, external_id: str) -> Optional[str]:
         # Mock markets are resolved manually via the admin endpoint.
         return None

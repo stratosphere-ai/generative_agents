@@ -1,5 +1,6 @@
 """Provider selection + transparent fallback to the mock provider."""
 from __future__ import annotations
+from typing import Optional
 
 import logging
 
@@ -47,10 +48,10 @@ class FallbackProvider(MarketProvider):
     def list_markets(self, limit: int = 50) -> list[MarketData]:
         return self._try("list_markets", limit)
 
-    def get_market(self, external_id: str) -> MarketData | None:
+    def get_market(self, external_id: str) -> Optional[MarketData]:
         return self._try("get_market", external_id)
 
-    def get_resolution(self, external_id: str) -> str | None:
+    def get_resolution(self, external_id: str) -> Optional[str]:
         return self._try("get_resolution", external_id)
 
 

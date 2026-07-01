@@ -9,6 +9,7 @@ sandbox's egress block) contributes zero candidates rather than raising, so
 matching degrades gracefully to synthetic books.
 """
 from __future__ import annotations
+from typing import Optional
 
 import logging
 
@@ -35,7 +36,7 @@ class MarketMatcher:
                 logger.warning("provider %s search failed (%s)", p.name, exc)
         return cands
 
-    def match(self, factor) -> tuple[MarketData, str] | None:
+    def match(self, factor) -> Optional[tuple[MarketData, str]]:
         """Return (market, provider_name) for the best match, or None."""
         query = getattr(factor, "search_query", None) or getattr(factor, "label", "")
         best = None

@@ -4,6 +4,7 @@ The append-only ``LedgerEntry`` journal is the source of truth for pool balances
 ``CapitalPool`` is a materialized cache recomputed from the ledger on every mutation.
 """
 from __future__ import annotations
+from typing import Optional
 
 from datetime import datetime, timezone
 
@@ -84,9 +85,9 @@ class Market(Base):
     provider: Mapped[str] = mapped_column(String(32))
     external_id: Mapped[str] = mapped_column(String(128))
     question: Mapped[str] = mapped_column(Text)
-    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     probability: Mapped[float] = mapped_column(Float)  # YES-implied probability p
-    end_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    end_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     status: Mapped[str] = mapped_column(String(24), default=MARKET_OPEN)
     synced_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
@@ -110,7 +111,7 @@ class Policy(Base):
 
     status: Mapped[str] = mapped_column(String(24), default=POLICY_ACTIVE)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
-    resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     user: Mapped["User"] = relationship(back_populates="policies")
     market: Mapped["Market"] = relationship(back_populates="policies")
@@ -126,9 +127,9 @@ class Shipment(Base):
     cargo_value: Mapped[float] = mapped_column(Float)  # insured value, e.g. 400_000
     origin: Mapped[str] = mapped_column(String(128))
     destination: Mapped[str] = mapped_column(String(128))
-    deadline: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    cargo_type: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    route: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    deadline: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    cargo_type: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    route: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     policy: Mapped["BasketPolicy"] = relationship(back_populates="shipment", uselist=False)
@@ -179,7 +180,7 @@ class HedgeLeg(Base):
     hedge_price: Mapped[float] = mapped_column(Float)  # = probability
     source: Mapped[str] = mapped_column(String(16), default="rule")  # discovery: rule|llm
     status: Mapped[str] = mapped_column(String(24), default=LEG_ACTIVE)
-    resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     policy: Mapped["BasketPolicy"] = relationship(back_populates="legs")
     market: Mapped["Market"] = relationship()
@@ -204,8 +205,8 @@ class LedgerEntry(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     ts: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
-    policy_id: Mapped[int | None] = mapped_column(ForeignKey("policies.id"), nullable=True)
-    basket_policy_id: Mapped[int | None] = mapped_column(
+    policy_id: Mapped[Optional[int]] = mapped_column(ForeignKey("policies.id"), nullable=True)
+    basket_policy_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey("basket_policies.id"), nullable=True
     )
     entry_type: Mapped[str] = mapped_column(String(32))

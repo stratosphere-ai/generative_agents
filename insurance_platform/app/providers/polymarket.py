@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any
+from typing import Any, Optional
 
 import httpx
 
@@ -38,14 +38,14 @@ def _loads_list(value: Any) -> list:
     return []
 
 
-def _yes_index(outcomes: list) -> int | None:
+def _yes_index(outcomes: list) -> Optional[int]:
     for i, o in enumerate(outcomes):
         if str(o).strip().lower() == "yes":
             return i
     return None
 
 
-def _extract_probability(raw: dict[str, Any]) -> float | None:
+def _extract_probability(raw: dict[str, Any]) -> Optional[float]:
     """YES-implied probability with a fallback chain."""
     outcomes = _loads_list(raw.get("outcomes"))
     prices = _loads_list(raw.get("outcomePrices"))
@@ -90,7 +90,7 @@ def _status(raw: dict[str, Any], probability: float) -> str:
     return "closed"
 
 
-def _to_market_data(raw: dict[str, Any]) -> MarketData | None:
+def _to_market_data(raw: dict[str, Any]) -> Optional[MarketData]:
     if not _is_binary(raw):
         return None
     prob = _extract_probability(raw)
@@ -139,7 +139,7 @@ class PolymarketGammaProvider(MarketProvider):
                 break
         return out
 
-    def get_market(self, external_id: str) -> MarketData | None:
+    def get_market(self, external_id: str) -> Optional[MarketData]:
         rows = self._get({"id": external_id})
         for raw in rows:
             md = _to_market_data(raw)
@@ -147,7 +147,7 @@ class PolymarketGammaProvider(MarketProvider):
                 return md
         return None
 
-    def get_resolution(self, external_id: str) -> str | None:
+    def get_resolution(self, external_id: str) -> Optional[str]:
         md = self.get_market(external_id)
         if md is None:
             return None

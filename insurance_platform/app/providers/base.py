@@ -4,15 +4,15 @@ from __future__ import annotations
 import re
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any, TypedDict
+from typing import Any, Optional, TypedDict
 
 
 class MarketData(TypedDict):
     external_id: str
     question: str
-    description: str | None
+    description: Optional[str]
     probability: float  # YES-implied probability, in (0, 1)
-    end_date: str | None  # ISO8601 or None
+    end_date: Optional[str]  # ISO8601 or None
     status: str  # "open" | "resolved_yes" | "resolved_no" | "closed"
     raw: dict[str, Any]
 
@@ -54,11 +54,11 @@ class MarketProvider(ABC):
         """Return currently insurable binary (Yes/No) markets."""
 
     @abstractmethod
-    def get_market(self, external_id: str) -> MarketData | None:
+    def get_market(self, external_id: str) -> Optional[MarketData]:
         """Return a single market by its provider id, or None."""
 
     @abstractmethod
-    def get_resolution(self, external_id: str) -> str | None:
+    def get_resolution(self, external_id: str) -> Optional[str]:
         """Return 'resolved_yes' | 'resolved_no', or None if unresolved."""
 
     def search_markets(self, query: str, limit: int = 40) -> list["ScoredMarket"]:

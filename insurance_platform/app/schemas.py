@@ -1,5 +1,6 @@
 """Pydantic request/response models for the API layer."""
 from __future__ import annotations
+from typing import Optional
 
 from datetime import datetime
 
@@ -13,9 +14,9 @@ class MarketOut(BaseModel):
     provider: str
     external_id: str
     question: str
-    description: str | None = None
+    description: Optional[str] = None
     probability: float
-    end_date: datetime | None = None
+    end_date: Optional[datetime] = None
     status: str
 
 
@@ -46,8 +47,8 @@ class PolicyOut(BaseModel):
     reserve: float
     status: str
     created_at: datetime
-    resolved_at: datetime | None = None
-    question: str | None = None
+    resolved_at: Optional[datetime] = None
+    question: Optional[str] = None
 
 
 class PoolOut(BaseModel):
@@ -95,9 +96,9 @@ class ShipmentQuoteRequest(BaseModel):
     cargo_value: float = Field(gt=0, description="Insured value of the cargo, e.g. 400000")
     origin: str
     destination: str
-    deadline: datetime | None = None
-    cargo_type: str | None = None
-    route: str | None = None
+    deadline: Optional[datetime] = None
+    cargo_type: Optional[str] = None
+    route: Optional[str] = None
 
 
 class FactorOut(BaseModel):
@@ -164,6 +165,6 @@ class BasketPolicyOut(BaseModel):
     cargo_value: float
     origin: str
     destination: str
-    deadline: datetime | None = None
-    cargo_type: str | None = None
+    deadline: Optional[datetime] = None
+    cargo_type: Optional[str] = None
     legs: list[HedgeLegOut]
